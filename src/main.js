@@ -4,7 +4,7 @@
 	// init curl
 	curl({
 
-		baseUrl: './',
+		baseUrl: '/',
 		packages: [
 
 			{
