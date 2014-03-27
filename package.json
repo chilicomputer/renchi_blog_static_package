@@ -1,0 +1,20 @@
+{
+	"name": "renchi-blog-static-package",
+	"version": "0.1.1",
+	"dependencies": {
+		"express": "3.x"
+	},
+	"devDependencies": {
+		"cram": "~0.7",
+		"express": "3.x"
+	},
+	"engines": {
+	  "node": "0.10.x",
+	  "npm": "1.1.x"
+	},
+	"scripts": {
+		"start": "node app.js",
+		"cram": "cram src/main.js -r ./src -o dist/bundle.js"
+	},
+	"readme":"/dist for online codes, /src for dev codes, /node_modules for dev tools"
+}

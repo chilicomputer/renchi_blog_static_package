@@ -1,0 +1,32 @@
+{{ function filter(d) { }}
+{{ return new Date(d).toLocaleDateString(); }}
+{{ } }}
+
+<section class="posts">
+{{? it.tag}}
+<h1 class="tag-top">
+    <span><span class="icon tag"></span>{{= it.tag}}</span>
+</h1>
+{{?}}
+{{~it.posts :p}}
+    <div class="post-item">
+        <div class="title">
+            <h1>{{= p.title}}</h1>
+            <p>{{= filter(p.date)}}</p>
+        </div>
+        <div class="preview">
+            {{= p.preview}}
+        </div>
+    </div>
+{{~}}
+{{? it.prev != null || it.next != null }}
+<div class="pagers">
+    {{? it.prev != null}}
+    <a href="#/page/{{= it.prev}}" title="前一页"><span class="icon new"></span></a>
+    {{?}}
+    {{? it.next != null}}
+    <a href="#/page/{{= it.next}}" title="后一页"><span class="icon old"></span></a>
+    {{?}}
+</div>
+{{?}}
+</section>

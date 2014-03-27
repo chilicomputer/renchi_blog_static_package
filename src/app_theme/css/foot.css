@@ -1,0 +1,34 @@
+footer {
+    padding-top: 40px;
+    padding-bottom: 40px;
+    text-align: center;
+    background: url( 'http://renchi.qiniudn.com/birds.svg');
+    background-size:cover;
+    background-position: 50% 0%;
+    background-repeat: no-repeat;
+    background-color: #fff;
+    color: #000;
+    font-family: third-font, sans-serif;
+}
+
+footer img {
+
+    width: 80px;
+    height: 80px;
+    border-radius: 80px;
+}
+
+footer h1, footer h2, footer p {
+
+    margin:0;
+}
+
+footer h1 {
+
+    font-size: 40px;
+}
+
+footer p {
+
+    font-size: 20px;
+}

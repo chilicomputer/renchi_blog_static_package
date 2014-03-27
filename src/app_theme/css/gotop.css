@@ -1,0 +1,24 @@
+.go-top .icon:before {
+	content:'\e612';
+}
+
+.go-top {
+	display: none;
+	position: fixed;
+	z-index: 9999;
+	top: 8px;
+	right: 8px;
+	color:#333;
+	font-size: 20px;
+	opacity: 0;
+	height: 0;
+	text-shadow: 0 40px 16px rgba(0,0,0,0.4);
+	cursor: pointer;
+}
+
+@media (min-width: 768px) {
+
+	.go-top:hover {
+		color: #8cf2e3;
+	}
+}

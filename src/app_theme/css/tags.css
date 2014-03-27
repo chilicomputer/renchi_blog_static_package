@@ -1,0 +1,70 @@
+section.tag-list ul {
+
+	padding-left: 0;
+}
+
+section.tag-list div {
+
+	display: inline-block;
+}
+
+section.tag-list li {
+
+	font-size: 18px;
+	font-weight: bold;
+	margin:8px;
+	list-style: none;
+}
+
+section.tag-list .icon:before {
+
+	content: "\e603";
+}
+
+section.tag-list a {
+
+	display: inline-block;
+	border: 1px solid #333;
+	border-radius: 4px;
+	padding: .2em .7em .2em .4em;
+}
+
+section.tag-list .count {
+
+
+	display: inline-block;
+	visibility: visible;
+	min-width: 10px;
+	padding: 3px 7px;
+	font-size: 12px;
+	font-weight: 700;
+	color: #fff;
+	line-height: 1;
+	vertical-align: baseline;
+	white-space: nowrap;
+	text-align: center;
+	background-color: #8cf2e3;
+	border-radius: 10px;
+	position: relative;
+	top: -1.5em;
+	left: -0.5em;
+}
+
+section.tag-list div:hover .count {
+
+	visibility: visible;
+}
+
+section.tag-list div:hover a {
+
+	background: #8cf2e3;
+	border-color:#8cf2e3;
+	color: #fff;
+}
+
+@media (min-width: 400px) {
+
+	section.tag-list li {
+		display: inline-block;
+	}
+}

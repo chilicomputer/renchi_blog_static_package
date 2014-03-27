@@ -1,0 +1,20 @@
+{{ function escape(s) { }}
+{{ return encodeURIComponent(s); }}
+{{ } }}
+
+<section class="tag-list">
+
+	<ul>
+		{{~it: t}}
+		<li>
+			<div>
+			<a class="item" href="#/tags/{{= escape(t.name)}}">
+				<span class="icon tag"></span>
+				<span class="name">{{= t.name}}</span>
+			</a>
+			<span class="count">{{= t.count}}</span>
+			</div>
+		</li>
+		{{~}}
+	</ul>
+</section>

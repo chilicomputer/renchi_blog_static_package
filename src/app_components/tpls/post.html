@@ -1,0 +1,30 @@
+{{ function filter(d) { }}
+{{ return new Date(d).toLocaleDateString(); }}
+{{ } }}
+{{ function escape(s) { }}
+{{ return encodeURIComponent(s); }}
+{{ } }}
+<section class="post">
+
+	<div class="title">
+        <h1>{{= it.title}}</h1>
+        <p>{{= filter(it.date)}}</p>
+    </div>
+
+    <div class="content">
+    	{{= it.content}}
+    </div>
+
+	<div class="foot">
+	    <ul>
+	    	{{~it.tags: t}}
+			<li>
+			<a href="#/tags/{{=escape(t)}}">
+				<span class="icon tag"></span>
+				<span class="name">{{= t}}</span>
+			</a>
+			</li>
+	    	{{~}}
+	    </ul>
+	</div>
+</section>

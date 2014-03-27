@@ -1,0 +1,73 @@
+section.about {
+	width: 100%;
+	min-height: 600px;
+	text-align: center;
+	padding-left: 0;
+	padding-right: 0;
+	color:#999;
+	font-size: 12px;
+}
+
+section.about .content {
+
+	max-width: 620px;
+	margin:0 auto;
+	padding: 0 20px;
+}
+
+section.about h1 {
+	color:#333;
+	font-size: 200%;
+}
+
+section.about h2 {
+
+	font-size: 120%;
+}
+
+section.about ul {
+
+	padding-left: 0;
+}
+
+section.about li {
+
+	list-style: none;
+	display: inline-block;
+	font-size: 140%;
+	margin-right: .5em;
+}
+
+section.about img {
+
+	max-width: 50%;
+}
+
+.icon.beer:before {
+
+	content: '\e617';
+}
+
+.icon.git:before {
+	content: '\e601';
+}
+
+.icon.weibo:before {
+
+	content: '\e600';
+}
+
+.icon.fb:before {
+
+	content: '\e60d';
+}
+
+.icon.linkedin:before {
+
+	content: '\e613';
+}
+
+.icon.mail:before {
+
+	content: '\e614';
+}
