@@ -14,7 +14,7 @@
 
 			{
 				name: 'theme',
-				location: 'app_theme/css',
+				location: 'app_components/styles',
 				config: {
 					moduleLoader: 'curl/plugin/css'
 				}

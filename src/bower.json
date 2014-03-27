@@ -14,7 +14,7 @@
 		"jquery"     : "~1.0",
 		"director"   : "~1.2",
 		"tweenjs"    : "",
-		"MathJax"    : "~2.3"
+		"MathJax"    : ""
 	},
 	"ignore": [
 	]
