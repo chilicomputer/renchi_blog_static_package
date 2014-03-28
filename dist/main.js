@@ -6,6 +6,10 @@
 	curl({
 
 		baseUrl: '/',
+		host: window.STATIC_HOST,
+		paths: {
+			'mathjax': 'http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML'
+		},
 		packages: [
 
 			{
@@ -73,6 +77,224 @@
 
 	curl( ['app'] );
 })( window.curl );
+/** MIT License (c) copyright 2010-2013 B Cavalier & J Hann */
+
+/**
+ * curl js! plugin
+ *
+ * Licensed under the MIT License at:
+ * 		http://www.opensource.org/licenses/mit-license.php
+ *
+ */
+
+/**
+ * usage:
+ *  require(['ModuleA', 'js!myNonAMDFile.js!order', 'js!anotherFile.js!order], function (ModuleA) {
+ * 		var a = new ModuleA();
+ * 		document.body.appendChild(a.domNode);
+ * 	});
+ *
+ * Specify the !order suffix for files that must be evaluated in order.
+ * Using the !order option and requiring js files more than once doesn't make
+ * much sense since files are loaded exactly once.
+ *
+ * Specify the !exports=someGlobalVar option to return a global variable to
+ * the module depending on the javascript file. Using this option also allows
+ * positive error feedback to the loader since it can now detect if the
+ * javascript file failed to load correctly.
+ *
+ * Async=false rules learned from @getify's LABjs!
+ * http://wiki.whatwg.org/wiki/Dynamic_Script_Execution_Order
+ *
+ */
+(function (global, doc, testGlobalVar) {
+define('curl/plugin/js', ['curl/_privileged'], function (priv) {
+"use strict";
+	var cache = {},
+		queue = [],
+		supportsAsyncFalse = doc && doc.createElement('script').async == true,
+		Promise,
+		waitForOrderedScript,
+		dontAddExtRx = /\?|\.js\b/;
+
+	Promise = priv['Promise'];
+
+	function nameWithExt (name, defaultExt) {
+		return name.lastIndexOf('.') <= name.lastIndexOf('/') ?
+			name + '.' + defaultExt : name;
+	}
+
+	function loadScript (def, success, failure) {
+		// script processing rules learned from RequireJS
+
+		var deadline, completed, el;
+
+		// default deadline is very far in the future (5 min)
+		// devs should set something reasonable if they want to use it
+		deadline = new Date().valueOf() + (def.timeoutMsec || 300000);
+
+		// initial script processing
+		function process () {
+			completed = true;
+			if (def.exports) def.resolved = testGlobalVar(def.exports);
+			if (!def.exports || def.resolved) {
+				success(el); // pass el so it can be removed (text/cache)
+			}
+			else {
+				failure();
+			}
+		}
+
+		function fail (ex) {
+			// Exception is squashed by curl.js unfortunately
+			completed = true;
+			failure(ex);
+		}
+
+		// some browsers (Opera and IE6-8) don't support onerror and don't fire
+		// readystatechange if the script fails to load so we need to poll.
+		// this poller only runs if def.exports is specified and failure callback
+		// is defined (see below)
+		function poller () {
+			// if the script loaded
+			if (!completed) {
+				// if neither process or fail as run and our deadline is in the past
+				if (deadline < new Date()) {
+					failure();
+				}
+				else {
+					setTimeout(poller, 10);
+				}
+			}
+		}
+		if (failure && def.exports) setTimeout(poller, 10);
+
+		el = priv['core'].loadScript(def, process, fail);
+
+	}
+
+	function fetch (def, promise) {
+
+		loadScript(def,
+			function () {
+				// if there's another queued script
+				var next = queue.shift();
+				waitForOrderedScript = queue.length > 0;
+				if (next) {
+					// go get it (from cache hopefully)
+					fetch.apply(null, next);
+				}
+				promise.resolve(def.resolved || true);
+			},
+			function (ex) {
+				promise.reject(ex);
+			}
+		);
+
+	}
+
+	return {
+
+		// the !options force us to cache ids in the plugin and provide normalize
+		'dynamic': true,
+
+		'normalize': function (id, toAbsId, config) {
+			var end = id.indexOf('!');
+			return end >= 0 ? toAbsId(id.substr(0, end)) + id.substr(end) : toAbsId(id);
+		},
+
+		'load': function (resId, require, callback, config) {
+
+			var order, exportsPos, exports, prefetch, dontAddFileExt,
+				url, def, promise;
+
+			order = resId.indexOf('!order') > 0; // can't be zero
+			exportsPos = resId.indexOf('!exports=');
+			exports = exportsPos > 0
+				? resId.substr(exportsPos + 9) // must be last option!
+				: config.exports;
+			prefetch = 'prefetch' in config ? config['prefetch'] : true;
+			resId = order || exportsPos > 0
+				? resId.substr(0, resId.indexOf('!'))
+				: resId;
+			// add extension afterwards so js!-specific path mappings don't
+			// need extension, too.
+			dontAddFileExt = config['dontAddFileExt'] || config.dontAddFileExt;
+			dontAddFileExt = dontAddFileExt
+				? new RegExp(dontAddFileExt)
+				: dontAddExtRx;
+
+			url = require['toUrl'](resId);
+			if (!dontAddFileExt.test(url)) {
+				url = nameWithExt(url, 'js');
+			}
+
+			function reject (ex) {
+				(callback['error'] || function (ex) { throw ex; })(ex);
+			}
+
+			// if we've already fetched this resource, get it out of the cache
+			if (url in cache) {
+				if (cache[url] instanceof Promise) {
+					cache[url].then(callback, reject);
+				}
+				else {
+					callback(cache[url]);
+				}
+			}
+			else {
+				def = {
+					name: resId,
+					url: url,
+					order: order,
+					exports: exports,
+					timeoutMsec: config['timeout']
+				};
+				cache[url] = promise = new Promise();
+				promise.then(
+					function (o) {
+						cache[url] = o;
+						callback(o);
+					},
+					reject
+				);
+
+				// if this script has to wait for another
+				// or if we're loading, but not executing it
+				if (order && !supportsAsyncFalse && waitForOrderedScript) {
+					// push onto the stack of scripts that will be fetched
+					// from cache. do this before fetch in case IE has file cached.
+					queue.push([def, promise]);
+					// if we're prefetching
+					if (prefetch) {
+						// go get the file under an unknown mime type
+						def.mimetype = 'text/cache';
+						loadScript(def,
+							// remove the fake script when loaded
+							function (el) { el && el.parentNode.removeChild(el); },
+							function () {}
+						);
+						def.mimetype = '';
+					}
+				}
+				// otherwise, just go get it
+				else {
+					waitForOrderedScript = waitForOrderedScript || order;
+					fetch(def, promise);
+				}
+			}
+
+		},
+
+		'cramPlugin': '../cram/js'
+
+	};
+});
+}(
+	this,
+	this.document,
+	function () { try { return eval(arguments[0]); } catch (ex) { return; } }
+));
 
 ;define('director/director', ['require', 'exports', 'module'], function (require, exports, module) {
 
@@ -9941,223 +10163,24 @@ return jQuery;
 });
 
 
-;define('curl/plugin/text!app/tpls/foot.html', function () {
-return "<footer class=\"top\">\n    <div class=\"container\">\n        <img src=\"http://s.gravatar.com/avatar/d42b5358bd29aeecf4a3b59102f8be56?s=80\"></img>\n        <p>Computer Graphics is Fun</p>\n        <h1>&trade;Renchi</h1>\n        <h2>&copy;1987-2014</h2>\n    </div>\n</footer>"
+;define('curl/plugin/text!app/tpls/postList.html', function () {
+return "{{ function filter(d) { }}\r\n{{ return new Date(d).toLocaleDateString(); }}\r\n{{ } }}\r\n\r\n<section class=\"posts\">\r\n{{? it.tag}}\r\n<h1 class=\"tag-top\">\r\n    <span><span class=\"icon tag\"></span>{{= it.tag}}</span>\r\n</h1>\r\n{{?}}\r\n{{~it.posts :p}}\r\n    <div class=\"post-item\">\r\n        <div class=\"title\">\r\n            <h1>{{= p.title}}</h1>\r\n            <p>{{= filter(p.date)}}</p>\r\n        </div>\r\n        <div class=\"preview\">\r\n            {{= p.preview}}\r\n        </div>\r\n    </div>\r\n{{~}}\r\n{{? it.prev != null || it.next != null }}\r\n<div class=\"pagers\">\r\n    {{? it.prev != null}}\r\n    <a href=\"#/page/{{= it.prev}}\" title=\"前一页\"><span class=\"icon new\"></span></a>\r\n    {{?}}\r\n    {{? it.next != null}}\r\n    <a href=\"#/page/{{= it.next}}\" title=\"后一页\"><span class=\"icon old\"></span></a>\r\n    {{?}}\r\n</div>\r\n{{?}}\r\n</section>"
 });
 
 ;define('curl/plugin/text!app/tpls/nav.html', function () {
-return "<header class=\"top-banner navbar\">\n    <div class=\"container\">\n        <div class=\"nav-header\">\n            <button class=\"menu-toggle\">\n                <span class=\"icon-toggle\"></span>\n                <span class=\"icon-toggle\"></span>\n                <span class=\"icon-toggle\"></span>\n            </button>\n            <a href=\"#/\" class=\"navbar-brand\">main()</a>\n        </div>\n        <nav class=\"navbar-collapse collapse\">\n            <ul class=\"navbar-nav\">\n                <li>\n\n                  <form action=\"#/search\">\n                    <input type=\"text\" name=\"search_text\" placeholder=\"search...\">\n                  </form>\n\n                </li>\n                <li>\n                  <a href=\"#/tags\"><span class=\"icon tags\"></span>标签</a>\n                </li>\n                <li>\n                  <a href=\"#/about\"><span class=\"icon about\"></span>关于</a>\n                </li>\n                <li>\n                  <a href=\"/demo/\"><span class=\"icon demos\"></span>试验</a>\n                </li>\n            </ul>\n        </nav>\n    </div>\n</header>"
+return "<header class=\"top-banner navbar\">\r\n    <div class=\"container\">\r\n        <div class=\"nav-header\">\r\n            <button class=\"menu-toggle\">\r\n                <span class=\"icon-toggle\"></span>\r\n                <span class=\"icon-toggle\"></span>\r\n                <span class=\"icon-toggle\"></span>\r\n            </button>\r\n            <a href=\"#/\" class=\"navbar-brand\">main()</a>\r\n        </div>\r\n        <nav class=\"navbar-collapse collapse\">\r\n            <ul class=\"navbar-nav\">\r\n                <li>\r\n\r\n                  <form action=\"#/search\">\r\n                    <input type=\"text\" name=\"search_text\" placeholder=\"search...\">\r\n                  </form>\r\n\r\n                </li>\r\n                <li>\r\n                  <a href=\"#/tags\"><span class=\"icon tags\"></span>标签</a>\r\n                </li>\r\n                <li>\r\n                  <a href=\"#/about\"><span class=\"icon about\"></span>关于</a>\r\n                </li>\r\n                <li>\r\n                  <a href=\"/demo/\"><span class=\"icon demos\"></span>试验</a>\r\n                </li>\r\n            </ul>\r\n        </nav>\r\n    </div>\r\n</header>"
 });
 
-;define('curl/plugin/text!app/tpls/postList.html', function () {
-return "{{ function filter(d) { }}\n{{ return new Date(d).toLocaleDateString(); }}\n{{ } }}\n\n<section class=\"posts\">\n{{? it.tag}}\n<h1 class=\"tag-top\">\n    <span><span class=\"icon tag\"></span>{{= it.tag}}</span>\n</h1>\n{{?}}\n{{~it.posts :p}}\n    <div class=\"post-item\">\n        <div class=\"title\">\n            <h1>{{= p.title}}</h1>\n            <p>{{= filter(p.date)}}</p>\n        </div>\n        <div class=\"preview\">\n            {{= p.preview}}\n        </div>\n    </div>\n{{~}}\n{{? it.prev != null || it.next != null }}\n<div class=\"pagers\">\n    {{? it.prev != null}}\n    <a href=\"#/page/{{= it.prev}}\" title=\"前一页\"><span class=\"icon new\"></span></a>\n    {{?}}\n    {{? it.next != null}}\n    <a href=\"#/page/{{= it.next}}\" title=\"后一页\"><span class=\"icon old\"></span></a>\n    {{?}}\n</div>\n{{?}}\n</section>"
-});
-
-;define('curl/plugin/text!app/tpls/post.html', function () {
-return "{{ function filter(d) { }}\n{{ return new Date(d).toLocaleDateString(); }}\n{{ } }}\n{{ function escape(s) { }}\n{{ return encodeURIComponent(s); }}\n{{ } }}\n<section class=\"post\">\n\n\t<div class=\"title\">\n        <h1>{{= it.title}}</h1>\n        <p>{{= filter(it.date)}}</p>\n    </div>\n\n    <div class=\"content\">\n    \t{{= it.content}}\n    </div>\n\n\t<div class=\"foot\">\n\t    <ul>\n\t    \t{{~it.tags: t}}\n\t\t\t<li>\n\t\t\t<a href=\"#/tags/{{=escape(t)}}\">\n\t\t\t\t<span class=\"icon tag\"></span>\n\t\t\t\t<span class=\"name\">{{= t}}</span>\n\t\t\t</a>\n\t\t\t</li>\n\t    \t{{~}}\n\t    </ul>\n\t</div>\n</section>"
+;define('curl/plugin/text!app/tpls/foot.html', function () {
+return "<footer class=\"top\">\r\n    <div class=\"container\">\r\n        <img src=\"http://s.gravatar.com/avatar/d42b5358bd29aeecf4a3b59102f8be56?s=80\"></img>\r\n        <p>Computer Graphics is Fun</p>\r\n        <h1>&trade;Renchi</h1>\r\n        <h2>&copy;1987-2014</h2>\r\n    </div>\r\n</footer>"
 });
 
 ;define('curl/plugin/text!app/tpls/tags.html', function () {
-return "{{ function escape(s) { }}\n{{ return encodeURIComponent(s); }}\n{{ } }}\n\n<section class=\"tag-list\">\n\n\t<ul>\n\t\t{{~it: t}}\n\t\t<li>\n\t\t\t<div>\n\t\t\t<a class=\"item\" href=\"#/tags/{{= escape(t.name)}}\">\n\t\t\t\t<span class=\"icon tag\"></span>\n\t\t\t\t<span class=\"name\">{{= t.name}}</span>\n\t\t\t</a>\n\t\t\t<span class=\"count\">{{= t.count}}</span>\n\t\t\t</div>\n\t\t</li>\n\t\t{{~}}\n\t</ul>\n</section>"
+return "{{ function escape(s) { }}\r\n{{ return encodeURIComponent(s); }}\r\n{{ } }}\r\n\r\n<section class=\"tag-list\">\r\n\r\n\t<ul>\r\n\t\t{{~it: t}}\r\n\t\t<li>\r\n\t\t\t<div>\r\n\t\t\t<a class=\"item\" href=\"#/tags/{{= escape(t.name)}}\">\r\n\t\t\t\t<span class=\"icon tag\"></span>\r\n\t\t\t\t<span class=\"name\">{{= t.name}}</span>\r\n\t\t\t</a>\r\n\t\t\t<span class=\"count\">{{= t.count}}</span>\r\n\t\t\t</div>\r\n\t\t</li>\r\n\t\t{{~}}\r\n\t</ul>\r\n</section>"
 });
 
 ;define('curl/plugin/text!app/tpls/about.html', function () {
-return "<section class=\"about\">\n\n<h1 class=\"title\"><span class=\"icon beer\"></span>Nice to meet you!</h1>\n<div class=\"bg\">\n\t<div class=\"content\">\n\t\t<h2 class=\"name\"><span>这是chillicomputer的blog</span></h2>\n\t\t<div class=\"intro\">\n\t\t\t<p><span>这个blog用于记录我在工作生活中是如何工作生活的，也可能有成人或非人的内容乱入。</span></p>\n\t\t</div>\n\t\t<div class=\"resume\">\n\t\t\t<p class=\"text\"><span>我喜欢图形学、猫奴、痴迷重金属、经常画画、热爱生活、向往自由、最欣赏的电影是Dark Knight和Fight Club、看过2遍以上的漫画是《幽油白书》和《無限の住人》。。。</span></p>\n\t\t\t<p class=\"text\"><span>Good Luck!</span></p>\n\t\t</div>\n\t\t<div class=\"social\">\n\t\t\t<ul>\n\t\t\t\t<li><a target=\"_blank\" href=\"https://github.com/chilicomputer\"><span class=\"icon git\"></span></a></li>\n\t\t\t\t<li><a target=\"_blank\" href=\"http://weibo.com/1856956684/\"><span class=\"icon weibo\"></span></a></li>\n\t\t\t\t<li><a target=\"_blank\" href=\"https://www.facebook.com/chillicomputer\"><span class=\"icon fb\"></span></a></li>\n\t\t\t\t<li><a target=\"_blank\" href=\"http://www.linkedin.com/profile/view?id=286118182\"><span class=\"icon linkedin\"></span></a></li>\n\t\t\t\t<li><a target=\"_blank\" href=\"mailto:chillicomputer@gmail.com?Subject=Hello%20again\"><span class=\"icon mail\"></span></a></li>\n\t\t\t</ul>\n\t\t</div>\n\t</div>\n</div>\n</section>"
-});
-// doT.js
-// 2011, Laura Doktorova, https://github.com/olado/doT
-// Licensed under the MIT license.
-
-(function() {
-	"use strict";
-
-	var doT = {
-		version: '1.0.1',
-		templateSettings: {
-			evaluate:    /\{\{([\s\S]+?(\}?)+)\}\}/g,
-			interpolate: /\{\{=([\s\S]+?)\}\}/g,
-			encode:      /\{\{!([\s\S]+?)\}\}/g,
-			use:         /\{\{#([\s\S]+?)\}\}/g,
-			useParams:   /(^|[^\w$])def(?:\.|\[[\'\"])([\w$\.]+)(?:[\'\"]\])?\s*\:\s*([\w$\.]+|\"[^\"]+\"|\'[^\']+\'|\{[^\}]+\})/g,
-			define:      /\{\{##\s*([\w\.$]+)\s*(\:|=)([\s\S]+?)#\}\}/g,
-			defineParams:/^\s*([\w$]+):([\s\S]+)/,
-			conditional: /\{\{\?(\?)?\s*([\s\S]*?)\s*\}\}/g,
-			iterate:     /\{\{~\s*(?:\}\}|([\s\S]+?)\s*\:\s*([\w$]+)\s*(?:\:\s*([\w$]+))?\s*\}\})/g,
-			varname:	'it',
-			strip:		true,
-			append:		true,
-			selfcontained: false
-		},
-		template: undefined, //fn, compile template
-		compile:  undefined  //fn, for express
-	}, global;
-
-	if (typeof module !== 'undefined' && module.exports) {
-		module.exports = doT;
-	} else if (typeof define === 'function' && define.amd) {
-		define('doT/doT', function () {return doT;});
-	} else {
-		global = (function(){ return this || (0,eval)('this'); }());
-		global.doT = doT;
-	}
-
-	function encodeHTMLSource() {
-		var encodeHTMLRules = { "&": "&#38;", "<": "&#60;", ">": "&#62;", '"': '&#34;', "'": '&#39;', "/": '&#47;' },
-			matchHTML = /&(?!#?\w+;)|<|>|"|'|\//g;
-		return function() {
-			return this ? this.replace(matchHTML, function(m) {return encodeHTMLRules[m] || m;}) : this;
-		};
-	}
-	String.prototype.encodeHTML = encodeHTMLSource();
-
-	var startend = {
-		append: { start: "'+(",      end: ")+'",      endencode: "||'').toString().encodeHTML()+'" },
-		split:  { start: "';out+=(", end: ");out+='", endencode: "||'').toString().encodeHTML();out+='"}
-	}, skip = /$^/;
-
-	function resolveDefs(c, block, def) {
-		return ((typeof block === 'string') ? block : block.toString())
-		.replace(c.define || skip, function(m, code, assign, value) {
-			if (code.indexOf('def.') === 0) {
-				code = code.substring(4);
-			}
-			if (!(code in def)) {
-				if (assign === ':') {
-					if (c.defineParams) value.replace(c.defineParams, function(m, param, v) {
-						def[code] = {arg: param, text: v};
-					});
-					if (!(code in def)) def[code]= value;
-				} else {
-					new Function("def", "def['"+code+"']=" + value)(def);
-				}
-			}
-			return '';
-		})
-		.replace(c.use || skip, function(m, code) {
-			if (c.useParams) code = code.replace(c.useParams, function(m, s, d, param) {
-				if (def[d] && def[d].arg && param) {
-					var rw = (d+":"+param).replace(/'|\\/g, '_');
-					def.__exp = def.__exp || {};
-					def.__exp[rw] = def[d].text.replace(new RegExp("(^|[^\\w$])" + def[d].arg + "([^\\w$])", "g"), "$1" + param + "$2");
-					return s + "def.__exp['"+rw+"']";
-				}
-			});
-			var v = new Function("def", "return " + code)(def);
-			return v ? resolveDefs(c, v, def) : v;
-		});
-	}
-
-	function unescape(code) {
-		return code.replace(/\\('|\\)/g, "$1").replace(/[\r\t\n]/g, ' ');
-	}
-
-	doT.template = function(tmpl, c, def) {
-		c = c || doT.templateSettings;
-		var cse = c.append ? startend.append : startend.split, needhtmlencode, sid = 0, indv,
-			str  = (c.use || c.define) ? resolveDefs(c, tmpl, def || {}) : tmpl;
-
-		str = ("var out='" + (c.strip ? str.replace(/(^|\r|\n)\t* +| +\t*(\r|\n|$)/g,' ')
-					.replace(/\r|\n|\t|\/\*[\s\S]*?\*\//g,''): str)
-			.replace(/'|\\/g, '\\$&')
-			.replace(c.interpolate || skip, function(m, code) {
-				return cse.start + unescape(code) + cse.end;
-			})
-			.replace(c.encode || skip, function(m, code) {
-				needhtmlencode = true;
-				return cse.start + unescape(code) + cse.endencode;
-			})
-			.replace(c.conditional || skip, function(m, elsecase, code) {
-				return elsecase ?
-					(code ? "';}else if(" + unescape(code) + "){out+='" : "';}else{out+='") :
-					(code ? "';if(" + unescape(code) + "){out+='" : "';}out+='");
-			})
-			.replace(c.iterate || skip, function(m, iterate, vname, iname) {
-				if (!iterate) return "';} } out+='";
-				sid+=1; indv=iname || "i"+sid; iterate=unescape(iterate);
-				return "';var arr"+sid+"="+iterate+";if(arr"+sid+"){var "+vname+","+indv+"=-1,l"+sid+"=arr"+sid+".length-1;while("+indv+"<l"+sid+"){"
-					+vname+"=arr"+sid+"["+indv+"+=1];out+='";
-			})
-			.replace(c.evaluate || skip, function(m, code) {
-				return "';" + unescape(code) + "out+='";
-			})
-			+ "';return out;")
-			.replace(/\n/g, '\\n').replace(/\t/g, '\\t').replace(/\r/g, '\\r')
-			.replace(/(\s|;|\}|^|\{)out\+='';/g, '$1').replace(/\+''/g, '')
-			.replace(/(\s|;|\}|^|\{)out\+=''\+/g,'$1out+=');
-
-		if (needhtmlencode && c.selfcontained) {
-			str = "String.prototype.encodeHTML=(" + encodeHTMLSource.toString() + "());" + str;
-		}
-		try {
-			return new Function(c.varname, str);
-		} catch (e) {
-			if (typeof console !== 'undefined') console.log("Could not create a template function: " + str);
-			throw e;
-		}
-	};
-
-	doT.compile = function(tmpl, def) {
-		return doT.template(tmpl, null, def);
-	};
-}());
-
-;define('app/utils/animationFrame', function () {
-
-    var vendor = [ 'ms', 'moz', 'webkit', 'o', '' ];
-
-    var requestAnimationFrame,
-        cancelAnimationFrame;
-
-    for ( var len = vendor.length; len--; ) {
-
-        var _v = vendor [len];
-
-        var attrRequest = _v ? _v + 'RequestAnimationFrame' : _v + 'requestAnimationFrame',
-            attrCancel  = _v ? _v + 'CancelAnimationFrame' : _v + 'cancelAnimationFrame';
-
-        if ( window[attrRequest] ) {
-
-            requestAnimationFrame = window[attrRequest];
-            cancelAnimationFrame = window[attrCancel];
-            break;
-        }
-    }
-
-    var lastTime = 0;
-
-    if ( !requestAnimationFrame ) {
-
-        requestAnimationFrame = function( render ) {
-
-            var currentTime = new Date().getTime();
-
-            var timeToWait = Math.max( 0, 16 - ( currentTime - lastTime ) );
-
-            var timer = setTimeout( function() {
-
-                render.call( null, currentTime + timeToWait );
-
-            }, timeToWait);
-
-            lastTime = currentTime + timeToWait;
-
-            return timer;
-        };
-    }
-
-    if ( !cancelAnimationFrame ) {
-
-        cancelAnimationFrame = function( timer ) {
-
-            clearTimeout( timer );
-        };
-    }
-
-    return {
-
-        request: requestAnimationFrame,
-        cancel:  cancelAnimationFrame
-    };
+return "<section class=\"about\">\r\n\r\n<h1 class=\"title\"><span class=\"icon beer\"></span>Nice to meet you!</h1>\r\n<div class=\"bg\">\r\n\t<div class=\"content\">\r\n\t\t<h2 class=\"name\"><span>这是chillicomputer的blog</span></h2>\r\n\t\t<div class=\"intro\">\r\n\t\t\t<p><span>这个blog用于记录我在工作生活中是如何工作生活的，也可能有成人或非人的内容乱入。</span></p>\r\n\t\t</div>\r\n\t\t<div class=\"resume\">\r\n\t\t\t<p class=\"text\"><span>我喜欢图形学、猫奴、痴迷重金属、经常画画、热爱生活、向往自由、最欣赏的电影是Dark Knight和Fight Club、看过2遍以上的漫画是《幽油白书》和《無限の住人》。。。</span></p>\r\n\t\t\t<p class=\"text\"><span>Good Luck!</span></p>\r\n\t\t</div>\r\n\t\t<div class=\"social\">\r\n\t\t\t<ul>\r\n\t\t\t\t<li><a target=\"_blank\" href=\"https://github.com/chilicomputer\"><span class=\"icon git\"></span></a></li>\r\n\t\t\t\t<li><a target=\"_blank\" href=\"http://weibo.com/1856956684/\"><span class=\"icon weibo\"></span></a></li>\r\n\t\t\t\t<li><a target=\"_blank\" href=\"https://www.facebook.com/chillicomputer\"><span class=\"icon fb\"></span></a></li>\r\n\t\t\t\t<li><a target=\"_blank\" href=\"http://www.linkedin.com/profile/view?id=286118182\"><span class=\"icon linkedin\"></span></a></li>\r\n\t\t\t\t<li><a target=\"_blank\" href=\"mailto:chillicomputer@gmail.com?Subject=Hello%20again\"><span class=\"icon mail\"></span></a></li>\r\n\t\t\t</ul>\r\n\t\t</div>\r\n\t</div>\r\n</div>\r\n</section>"
 });
 /**
  * @author sole / http://soledadpenades.com
@@ -10907,6 +10930,205 @@ define('tween/Tween.js', function () {
 	return TWEEN;
 });
 
+
+;define('app/utils/animationFrame', function () {
+
+    var vendor = [ 'ms', 'moz', 'webkit', 'o', '' ];
+
+    var requestAnimationFrame,
+        cancelAnimationFrame;
+
+    for ( var len = vendor.length; len--; ) {
+
+        var _v = vendor [len];
+
+        var attrRequest = _v ? _v + 'RequestAnimationFrame' : _v + 'requestAnimationFrame',
+            attrCancel  = _v ? _v + 'CancelAnimationFrame' : _v + 'cancelAnimationFrame';
+
+        if ( window[attrRequest] ) {
+
+            requestAnimationFrame = window[attrRequest];
+            cancelAnimationFrame = window[attrCancel];
+            break;
+        }
+    }
+
+    var lastTime = 0;
+
+    if ( !requestAnimationFrame ) {
+
+        requestAnimationFrame = function( render ) {
+
+            var currentTime = new Date().getTime();
+
+            var timeToWait = Math.max( 0, 16 - ( currentTime - lastTime ) );
+
+            var timer = setTimeout( function() {
+
+                render.call( null, currentTime + timeToWait );
+
+            }, timeToWait);
+
+            lastTime = currentTime + timeToWait;
+
+            return timer;
+        };
+    }
+
+    if ( !cancelAnimationFrame ) {
+
+        cancelAnimationFrame = function( timer ) {
+
+            clearTimeout( timer );
+        };
+    }
+
+    return {
+
+        request: requestAnimationFrame,
+        cancel:  cancelAnimationFrame
+    };
+});
+// doT.js
+// 2011, Laura Doktorova, https://github.com/olado/doT
+// Licensed under the MIT license.
+
+(function() {
+	"use strict";
+
+	var doT = {
+		version: '1.0.1',
+		templateSettings: {
+			evaluate:    /\{\{([\s\S]+?(\}?)+)\}\}/g,
+			interpolate: /\{\{=([\s\S]+?)\}\}/g,
+			encode:      /\{\{!([\s\S]+?)\}\}/g,
+			use:         /\{\{#([\s\S]+?)\}\}/g,
+			useParams:   /(^|[^\w$])def(?:\.|\[[\'\"])([\w$\.]+)(?:[\'\"]\])?\s*\:\s*([\w$\.]+|\"[^\"]+\"|\'[^\']+\'|\{[^\}]+\})/g,
+			define:      /\{\{##\s*([\w\.$]+)\s*(\:|=)([\s\S]+?)#\}\}/g,
+			defineParams:/^\s*([\w$]+):([\s\S]+)/,
+			conditional: /\{\{\?(\?)?\s*([\s\S]*?)\s*\}\}/g,
+			iterate:     /\{\{~\s*(?:\}\}|([\s\S]+?)\s*\:\s*([\w$]+)\s*(?:\:\s*([\w$]+))?\s*\}\})/g,
+			varname:	'it',
+			strip:		true,
+			append:		true,
+			selfcontained: false
+		},
+		template: undefined, //fn, compile template
+		compile:  undefined  //fn, for express
+	}, global;
+
+	if (typeof module !== 'undefined' && module.exports) {
+		module.exports = doT;
+	} else if (typeof define === 'function' && define.amd) {
+		define('doT/doT', function () {return doT;});
+	} else {
+		global = (function(){ return this || (0,eval)('this'); }());
+		global.doT = doT;
+	}
+
+	function encodeHTMLSource() {
+		var encodeHTMLRules = { "&": "&#38;", "<": "&#60;", ">": "&#62;", '"': '&#34;', "'": '&#39;', "/": '&#47;' },
+			matchHTML = /&(?!#?\w+;)|<|>|"|'|\//g;
+		return function() {
+			return this ? this.replace(matchHTML, function(m) {return encodeHTMLRules[m] || m;}) : this;
+		};
+	}
+	String.prototype.encodeHTML = encodeHTMLSource();
+
+	var startend = {
+		append: { start: "'+(",      end: ")+'",      endencode: "||'').toString().encodeHTML()+'" },
+		split:  { start: "';out+=(", end: ");out+='", endencode: "||'').toString().encodeHTML();out+='"}
+	}, skip = /$^/;
+
+	function resolveDefs(c, block, def) {
+		return ((typeof block === 'string') ? block : block.toString())
+		.replace(c.define || skip, function(m, code, assign, value) {
+			if (code.indexOf('def.') === 0) {
+				code = code.substring(4);
+			}
+			if (!(code in def)) {
+				if (assign === ':') {
+					if (c.defineParams) value.replace(c.defineParams, function(m, param, v) {
+						def[code] = {arg: param, text: v};
+					});
+					if (!(code in def)) def[code]= value;
+				} else {
+					new Function("def", "def['"+code+"']=" + value)(def);
+				}
+			}
+			return '';
+		})
+		.replace(c.use || skip, function(m, code) {
+			if (c.useParams) code = code.replace(c.useParams, function(m, s, d, param) {
+				if (def[d] && def[d].arg && param) {
+					var rw = (d+":"+param).replace(/'|\\/g, '_');
+					def.__exp = def.__exp || {};
+					def.__exp[rw] = def[d].text.replace(new RegExp("(^|[^\\w$])" + def[d].arg + "([^\\w$])", "g"), "$1" + param + "$2");
+					return s + "def.__exp['"+rw+"']";
+				}
+			});
+			var v = new Function("def", "return " + code)(def);
+			return v ? resolveDefs(c, v, def) : v;
+		});
+	}
+
+	function unescape(code) {
+		return code.replace(/\\('|\\)/g, "$1").replace(/[\r\t\n]/g, ' ');
+	}
+
+	doT.template = function(tmpl, c, def) {
+		c = c || doT.templateSettings;
+		var cse = c.append ? startend.append : startend.split, needhtmlencode, sid = 0, indv,
+			str  = (c.use || c.define) ? resolveDefs(c, tmpl, def || {}) : tmpl;
+
+		str = ("var out='" + (c.strip ? str.replace(/(^|\r|\n)\t* +| +\t*(\r|\n|$)/g,' ')
+					.replace(/\r|\n|\t|\/\*[\s\S]*?\*\//g,''): str)
+			.replace(/'|\\/g, '\\$&')
+			.replace(c.interpolate || skip, function(m, code) {
+				return cse.start + unescape(code) + cse.end;
+			})
+			.replace(c.encode || skip, function(m, code) {
+				needhtmlencode = true;
+				return cse.start + unescape(code) + cse.endencode;
+			})
+			.replace(c.conditional || skip, function(m, elsecase, code) {
+				return elsecase ?
+					(code ? "';}else if(" + unescape(code) + "){out+='" : "';}else{out+='") :
+					(code ? "';if(" + unescape(code) + "){out+='" : "';}out+='");
+			})
+			.replace(c.iterate || skip, function(m, iterate, vname, iname) {
+				if (!iterate) return "';} } out+='";
+				sid+=1; indv=iname || "i"+sid; iterate=unescape(iterate);
+				return "';var arr"+sid+"="+iterate+";if(arr"+sid+"){var "+vname+","+indv+"=-1,l"+sid+"=arr"+sid+".length-1;while("+indv+"<l"+sid+"){"
+					+vname+"=arr"+sid+"["+indv+"+=1];out+='";
+			})
+			.replace(c.evaluate || skip, function(m, code) {
+				return "';" + unescape(code) + "out+='";
+			})
+			+ "';return out;")
+			.replace(/\n/g, '\\n').replace(/\t/g, '\\t').replace(/\r/g, '\\r')
+			.replace(/(\s|;|\}|^|\{)out\+='';/g, '$1').replace(/\+''/g, '')
+			.replace(/(\s|;|\}|^|\{)out\+=''\+/g,'$1out+=');
+
+		if (needhtmlencode && c.selfcontained) {
+			str = "String.prototype.encodeHTML=(" + encodeHTMLSource.toString() + "());" + str;
+		}
+		try {
+			return new Function(c.varname, str);
+		} catch (e) {
+			if (typeof console !== 'undefined') console.log("Could not create a template function: " + str);
+			throw e;
+		}
+	};
+
+	doT.compile = function(tmpl, def) {
+		return doT.template(tmpl, null, def);
+	};
+}());
+
+;define('curl/plugin/text!app/tpls/post.html', function () {
+return "{{ function filter(d) { }}\r\n{{ return new Date(d).toLocaleDateString(); }}\r\n{{ } }}\r\n{{ function escape(s) { }}\r\n{{ return encodeURIComponent(s); }}\r\n{{ } }}\r\n<section class=\"post\">\r\n\r\n\t<div class=\"title\">\r\n        <h1>{{= it.title}}</h1>\r\n        <p>{{= filter(it.date)}}</p>\r\n    </div>\r\n\r\n    <div class=\"content\">\r\n    \t{{= it.content}}\r\n    </div>\r\n\r\n\t<div class=\"foot\">\r\n\t    <ul>\r\n\t    \t{{~it.tags: t}}\r\n\t\t\t<li>\r\n\t\t\t<a href=\"#/tags/{{=escape(t)}}\">\r\n\t\t\t\t<span class=\"icon tag\"></span>\r\n\t\t\t\t<span class=\"name\">{{= t}}</span>\r\n\t\t\t</a>\r\n\t\t\t</li>\r\n\t    \t{{~}}\r\n\t    </ul>\r\n\t</div>\r\n</section>"
+});
 /** MIT License (c) copyright 2010-2013 B Cavalier & J Hann */
 
 /**
@@ -11054,6 +11276,64 @@ define('curl/plugin/style', function () {
 
 	return createStyle;
 });
+/*
+ * Copyright 2012 the original author or authors
+ * @license MIT, see LICENSE.txt for details
+ *
+ * @author Scott Andrews
+ */
+
+(function (define) {
+	'use strict';
+
+	define('rest/mime/type/text/plain', ['require'], function () {
+
+		return {
+
+			read: function (str) {
+				return str;
+			},
+
+			write: function (obj) {
+				return obj.toString();
+			}
+
+		};
+	});
+
+}(
+	typeof define === 'function' && define.amd ? define : function (factory) { module.exports = factory(require); }
+	// Boilerplate for AMD and Node
+));
+/*
+ * Copyright 2012 the original author or authors
+ * @license MIT, see LICENSE.txt for details
+ *
+ * @author Scott Andrews
+ */
+
+(function (define) {
+	'use strict';
+
+	define('rest/mime/type/application/json', ['require'], function () {
+
+		return {
+
+			read: function (str) {
+				return JSON.parse(str);
+			},
+
+			write: function (obj) {
+				return JSON.stringify(obj);
+			}
+
+		};
+	});
+
+}(
+	typeof define === 'function' && define.amd ? define : function (factory) { module.exports = factory(require); }
+	// Boilerplate for AMD and Node
+));
 /** @license MIT License (c) copyright 2011-2013 original author or authors */
 
 /**
@@ -11991,44 +12271,6 @@ define('when/when', ['require'], function (require) {
 });
 })(typeof define === 'function' && define.amd ? define : function (factory) { module.exports = factory(require); });
 /*
- * Copyright 2012 the original author or authors
- * @license MIT, see LICENSE.txt for details
- *
- * @author Scott Andrews
- */
-
-(function (define) {
-	'use strict';
-
-	define('rest/util/normalizeHeaderName', ['require'], function () {
-
-		/**
-		 * Normalize HTTP header names using the pseudo camel case.
-		 *
-		 * For example:
-		 *   content-type         -> Content-Type
-		 *   accepts              -> Accepts
-		 *   x-custom-header-name -> X-Custom-Header-Name
-		 *
-		 * @param {string} name the raw header name
-		 * @return {string} the normalized header name
-		 */
-		function normalizeHeaderName(name) {
-			return name.toLowerCase()
-				.split('-')
-				.map(function (chunk) { return chunk.charAt(0).toUpperCase() + chunk.slice(1); })
-				.join('-');
-		}
-
-		return normalizeHeaderName;
-
-	});
-
-}(
-	typeof define === 'function' && define.amd ? define : function (factory) { module.exports = factory(require); }
-	// Boilerplate for AMD and Node
-));
-/*
  * Copyright 2012-2013 the original author or authors
  * @license MIT, see LICENSE.txt for details
  *
@@ -12076,111 +12318,9 @@ define('when/when', ['require'], function (require) {
 	typeof define === 'function' && define.amd ? define : function (factory) { module.exports = factory(require); }
 	// Boilerplate for AMD and Node
 ));
-/*
- * Copyright 2012 the original author or authors
- * @license MIT, see LICENSE.txt for details
- *
- * @author Scott Andrews
- */
 
-(function (define) {
-	'use strict';
-
-	define('rest/mime/type/text/plain', ['require'], function () {
-
-		return {
-
-			read: function (str) {
-				return str;
-			},
-
-			write: function (obj) {
-				return obj.toString();
-			}
-
-		};
-	});
-
-}(
-	typeof define === 'function' && define.amd ? define : function (factory) { module.exports = factory(require); }
-	// Boilerplate for AMD and Node
-));
-/*
- * Copyright 2012 the original author or authors
- * @license MIT, see LICENSE.txt for details
- *
- * @author Scott Andrews
- */
-
-(function (define) {
-	'use strict';
-
-	define('rest/mime/type/application/json', ['require'], function () {
-
-		return {
-
-			read: function (str) {
-				return JSON.parse(str);
-			},
-
-			write: function (obj) {
-				return JSON.stringify(obj);
-			}
-
-		};
-	});
-
-}(
-	typeof define === 'function' && define.amd ? define : function (factory) { module.exports = factory(require); }
-	// Boilerplate for AMD and Node
-));
-
-;define('theme/nav', ['curl/plugin/style', 'require'], function (injector, require) { var text = ".top-banner {\n    margin-bottom: 0;\n    background-color: #333;\n    border-bottom: 0;\n    position: relative;\n    min-height: 50px;\n    border: 1px solid transparent;\n    z-index: 1001;\n}\n\n.top-banner a {\n\n    color: #fff;\n}\n\n.top-banner .container {\n\n    margin-right: auto;\n    margin-left: auto;\n    padding-left: 15px;\n    padding-right: 15px;\n}\n\n.nav-header, .top-banner .navbar-collapse {\n\n    margin-right: -15px;\n    margin-left: -15px;\n}\n\n .nav-header:after, .navbar-collapse:after, .navbar-nav:after {\n    content:\"\";\n    display: table;\n    clear: both;\n}\n\n .menu-toggle {\n    position: relative;\n    float: right;\n    margin-right: 15px;\n    padding: 9px 10px;\n    margin-top: 8px;\n    margin-bottom: 8px;\n    background-color: transparent;\n    background-image: none;\n    border: 1px solid transparent;\n    border-radius: 4px;\n    cursor: pointer;\n}\n\n .icon-toggle {\n\n    display: block;\n    width: 22px;\n    height: 2px;\n    border-radius: 1px;\n    background: white;\n}\n .icon-toggle+.icon-toggle {\n    margin-top: 4px;\n}\n\n\n .navbar-brand {\n\n    font-family: third-font;\n    font-weight: 500;\n    float: left;\n    padding: 15px;\n    font-size: 18px;\n    line-height: 20px;\n    height: 50px;\n}\n\n .navbar-collapse {\n\n    padding-right: 15px;\n    padding-left: 15px;\n    border-top: 1px solid transparent;\n    box-shadow: inset 0 1px 0 rgba(255,255,255,.1);\n    height: 0;\n    overflow-y: hidden;\n    overflow-x: visible;\n}\n\n .navbar-nav {\n\n    margin: 7.5px -15px;\n    padding-left: 0;\n    list-style: none;\n}\n\n .navbar-nav>li {\n\n    position: relative;\n    display: block;\n}\n\n .navbar-nav>li>* {\n\n    position: relative;\n    display: block;\n    padding: 10px 15px;\n}\n\n .icon.tags:before {\n    content: '\\e605';\n }\n\n  .icon.about:before {\n    content: '\\e608';\n }\n  .icon.demos:before {\n    content: '\\e610';\n }\n\n .navbar-nav input {\n    display: block;\n    width: 100%;\n    height: 34px;\n    padding: 4px 8px;\n    font-size: 14px;\n    line-height: 1.42857143;\n    color: #555;\n    background: #eee;\n    border-color: #666;\n    background-image: none;\n    border: 1px solid #ccc;\n    border-radius: 4px;\n    box-shadow: inset 0 1px 1px rgba(0,0,0,.075);\n    -webkit-transition: border-color ease-in-out .15s,box-shadow ease-in-out .15s;\n    -ms-transition: border-color ease-in-out .15s,box-shadow ease-in-out .15s;\n    -moz-transition: border-color ease-in-out .15s,box-shadow ease-in-out .15s;\n    -o-transition: border-color ease-in-out .15s,box-shadow ease-in-out .15s;\n    transition: border-color ease-in-out .15s,box-shadow ease-in-out .15s;\n}\n\n .navbar-nav input:focus {\n\n    box-shadow: inset 0 1px 1px rgba(0,0,0,.075),0 0 11px rgba(255,255,255,.7);\n}\n\n\n@media (min-width: 768px) {\n\n    .top-banner .container {\n\n        width: 720px;\n    }\n\n     .menu-toggle {\n\n        display: none;\n    }\n\n     .nav-header {\n\n        float: left;\n    }\n\n     .navbar-collapse {\n\n        margin-right: 0;\n        margin-left: 0;\n        padding-left: 0;\n        padding-right: 0;\n        width: auto;\n        border-top: 0;\n        box-shadow: none;\n    }\n\n     .navbar-collapse.collapse {\n        display: block!important;\n        height: auto!important;\n        padding-bottom: 0;\n        overflow: visible!important;\n    }\n\n     .navbar-nav {\n\n        margin: 0;\n        float: right!important;\n    }\n\n     .navbar-nav>li {\n\n        float: left;\n    }\n\n     .navbar-nav>li>a {\n\n        padding-top: 15px;\n        padding-bottom: 15px;\n    }\n\n    .navbar-nav input {\n\n        padding-top: 2px;\n        padding-bottom: 2px;\n        width:310px;\n    }\n\n     .menu-toggle:hover {\n\n        background: #649def;\n    }\n}"; if (0) text = injector.translateUrls(text, require.toUrl("")); return text; });
-define('curl/plugin/css!theme/nav', ['curl/plugin/style!theme/nav'], function (sheet) { return sheet; });
-
-;define('theme/foot', ['curl/plugin/style', 'require'], function (injector, require) { var text = "footer {\n    padding-top: 40px;\n    padding-bottom: 40px;\n    text-align: center;\n    background: url( 'http://renchi.qiniudn.com/birds.svg');\n    background-size:cover;\n    background-position: 50% 0%;\n    background-repeat: no-repeat;\n    background-color: #fff;\n    color: #000;\n    font-family: third-font, sans-serif;\n}\n\nfooter img {\n\n    width: 80px;\n    height: 80px;\n    border-radius: 80px;\n}\n\nfooter h1, footer h2, footer p {\n\n    margin:0;\n}\n\nfooter h1 {\n\n    font-size: 40px;\n}\n\nfooter p {\n\n    font-size: 20px;\n}"; if (0) text = injector.translateUrls(text, require.toUrl("")); return text; });
-define('curl/plugin/css!theme/foot', ['curl/plugin/style!theme/foot'], function (sheet) { return sheet; });
-
-;define('theme/postList', ['curl/plugin/style', 'require'], function (injector, require) { var text = ".posts {\n\n    color: #666;\n}\n\n.posts .tag-top {\n\n    font-size: 1em;\n    margin-bottom: 72px;\n}\n\n.posts .tag-top>span {\n\n    padding: .5em;\n    border-radius: .5em;\n    background: #666;\n    color: #fff;\n    box-shadow: 0 60px 20px rgba(0,0,0,0.1);\n}\n\n.posts .title h1 {\n\n    color: #333;\n}\n\n.posts .title p {\n\n    color: #aaa;\n    font-size: 12px;\n    margin: 5px 0 3px 3px;\n}\n\n.posts .preview {\n\n    padding: 6px 18px;\n}\n\n.posts .more {\n\n    color: #fff;\n    background-color: #333;\n    position: relative;\n    display: block;\n    padding: 10px 15px;\n    border-radius: 4px;\n    text-align: center;\n}\n\n.posts .more:hover {\n\n    background-color: #8cf2e3;\n}\n\n.posts .pagers {\n\n    text-align: center;\n    border-top: 1px solid #333;\n    margin-top: 40px;\n    padding-top: 40px;\n}\n\n.posts .pagers a {\n\n    display: inline-block;\n    width: 40px;\n    height: 40px;\n    border-radius: 40px;\n    background: #333;\n    color: #fff;\n    line-height: 40px;\n}\n\n.posts .pagers a:hover {\n\n    background: #84fbca;\n}\n\n.icon.new, .icon.old {\n    margin:0;\n}\n\n.icon.new:before {\n    content:'\\e60b';\n}\n\n.icon.old:before {\n    content:'\\e60c';\n}\n\n.posts .icon.tag:before {\n    content: '\\e603';\n}"; if (0) text = injector.translateUrls(text, require.toUrl("")); return text; });
+;define('theme/postList', ['curl/plugin/style', 'require'], function (injector, require) { var text = ".posts {\r\n\r\n    color: #666;\r\n}\r\n\r\n.posts .tag-top {\r\n\r\n    font-size: 1em;\r\n    margin-bottom: 72px;\r\n}\r\n\r\n.posts .tag-top>span {\r\n\r\n    padding: .5em;\r\n    border-radius: .5em;\r\n    background: #666;\r\n    color: #fff;\r\n    box-shadow: 0 60px 20px rgba(0,0,0,0.1);\r\n}\r\n\r\n.posts .title h1 {\r\n\r\n    color: #333;\r\n}\r\n\r\n.posts .title p {\r\n\r\n    color: #aaa;\r\n    font-size: 12px;\r\n    margin: 5px 0 3px 3px;\r\n}\r\n\r\n.posts .preview {\r\n\r\n    padding: 6px 18px;\r\n}\r\n\r\n.posts .more {\r\n\r\n    color: #fff;\r\n    background-color: #333;\r\n    position: relative;\r\n    display: block;\r\n    padding: 10px 15px;\r\n    border-radius: 4px;\r\n    text-align: center;\r\n}\r\n\r\n.posts .more:hover {\r\n\r\n    background-color: #8cf2e3;\r\n}\r\n\r\n.posts .pagers {\r\n\r\n    text-align: center;\r\n    border-top: 1px solid #333;\r\n    margin-top: 40px;\r\n    padding-top: 40px;\r\n}\r\n\r\n.posts .pagers a {\r\n\r\n    display: inline-block;\r\n    width: 40px;\r\n    height: 40px;\r\n    border-radius: 40px;\r\n    background: #333;\r\n    color: #fff;\r\n    line-height: 40px;\r\n}\r\n\r\n.posts .pagers a:hover {\r\n\r\n    background: #84fbca;\r\n}\r\n\r\n.icon.new, .icon.old {\r\n    margin:0;\r\n}\r\n\r\n.icon.new:before {\r\n    content:'\\e60b';\r\n}\r\n\r\n.icon.old:before {\r\n    content:'\\e60c';\r\n}\r\n\r\n.posts .icon.tag:before {\r\n    content: '\\e603';\r\n}"; if (0) text = injector.translateUrls(text, require.toUrl("")); return text; });
 define('curl/plugin/css!theme/postList', ['curl/plugin/style!theme/postList'], function (sheet) { return sheet; });
-
-;define('theme/loader', ['curl/plugin/style', 'require'], function (injector, require) { var text = ".loader {\n\tposition: fixed;\n\tz-index: 9999;\n\tleft:50%;\n\ttop:50%;\n\tmargin-top: -60px;\n\tmargin-left: -40px;\n\twidth: 90px;\n\theight: 60px;\n  \tlist-style: none;\n  \tpadding: 0;\n}\n\n@-webkit-keyframes 'loadbars' {\n\t0%{\n\t\theight: 10px;\n\t\tmargin-top: 30px;\n\t}\n\t50%{\n\t\theight:60px;\n\t\tmargin-top: 0px;\n\t}\n\t100%{\n\t\theight: 10px;\n\t\tmargin-top: 30px;\n\t}\n}\n\n@-ms-keyframes 'loadbars' {\n\t0%{\n\t\theight: 10px;\n\t\tmargin-top: 25px;\n\t}\n\t50%{\n\t\theight:50px;\n\t\tmargin-top: 0px;\n\t}\n\t100%{\n\t\theight: 10px;\n\t\tmargin-top: 25px;\n\t}\n}\n\n@-o-keyframes 'loadbars' {\n\t0%{\n\t\theight: 10px;\n\t\tmargin-top: 25px;\n\t}\n\t50%{\n\t\theight:50px;\n\t\tmargin-top: 0px;\n\t}\n\t100%{\n\t\theight: 10px;\n\t\tmargin-top: 25px;\n\t}\n}\n\n@-moz-keyframes 'loadbars' {\n\t0%{\n\t\theight: 10px;\n\t\tmargin-top: 25px;\n\t}\n\t50%{\n\t\theight:50px;\n\t\tmargin-top: 0px;\n\t}\n\t100%{\n\t\theight: 10px;\n\t\tmargin-top: 25px;\n\t}\n}\n\n@keyframes 'loadbars' {\n\t0%{\n\t\theight: 10px;\n\t\tmargin-top: 25px;\n\t}\n\t50%{\n\t\theight:50px;\n\t\tmargin-top: 0px;\n\t}\n\t100%{\n\t\theight: 10px;\n\t\tmargin-top: 25px;\n\t}\n}\n\n.loader li{\n\tbackground-color: #666;\n\twidth: 10px;\n\theight: 10px;\n\tfloat: right;\n\tmargin-right: 5px;\n    box-shadow: 0px 100px 20px rgba(0,0,0,0.4);\n}\n.loader li:first-child{\n\t-webkit-animation: loadbars .6s ease-in-out infinite 0s;\n}\n.loader li:nth-child(2){\n\t-webkit-animation: loadbars .6s ease-in-out infinite -0.1s;\n}\n.loader li:nth-child(3){\n\t-webkit-animation: loadbars .6s ease-in-out infinite -0.2s;\n}\n.loader li:nth-child(4){\n\t-webkit-animation: loadbars .6s ease-in-out infinite -0.3s;\n}\n.loader li:nth-child(5){\n\t-webkit-animation: loadbars .6s ease-in-out infinite -0.4s;\n}\n.loader li:nth-child(6){\n\t-webkit-animation: loadbars .6s ease-in-out infinite -0.5s;\n}"; if (0) text = injector.translateUrls(text, require.toUrl("")); return text; });
-define('curl/plugin/css!theme/loader', ['curl/plugin/style!theme/loader'], function (sheet) { return sheet; });
-
-;define('app/partials/foot', ['curl/plugin/text!app/tpls/foot.html', 'theme/foot', 'jquery/jquery'], function (
-    footTplStr, dumbStyle, $
-) {
-'use strict';
-
-    /**
-     * title
-     * @created date
-     * @author chillicomputer@gmail.com
-     */
-
-    var exports = {};
-    var $foot;
-
-    var main = function() {
-
-        exports.init   = init;
-        exports.getDom = getDom;
-    };
-
-    var init = function( container ) {
-
-        $foot = $( footTplStr ).appendTo( container );
-    };
-
-    var getDom = function() {
-
-        return $foot;
-    };
-
-    main();
-
-    return exports;
-});
 /*
  * Copyright 2012 the original author or authors
  * @license MIT, see LICENSE.txt for details
@@ -12191,34 +12331,27 @@ define('curl/plugin/css!theme/loader', ['curl/plugin/style!theme/loader'], funct
 (function (define) {
 	'use strict';
 
-	// derived from dojo.delegate
-	define('rest/util/beget', ['require', './mixin'], function (require, $cram_r0) {
-
-		var mixin;
-
-		mixin = $cram_r0;
-
-		function Beget() {}
+	define('rest/util/normalizeHeaderName', ['require'], function () {
 
 		/**
-		 * Creates a new object with the provided object as it's prototype.
-		 * Additional properties may be mixed into the new object.
+		 * Normalize HTTP header names using the pseudo camel case.
 		 *
-		 * @param {Object} obj the new object's prototype
-		 * @param {Object} [props] additional properties to mixin to the new object
-		 * @return {Object} the new object
+		 * For example:
+		 *   content-type         -> Content-Type
+		 *   accepts              -> Accepts
+		 *   x-custom-header-name -> X-Custom-Header-Name
+		 *
+		 * @param {string} name the raw header name
+		 * @return {string} the normalized header name
 		 */
-		function beget(obj, props) {
-			Beget.prototype = obj;
-			var tmp = new Beget();
-			Beget.prototype = null;
-			if (props) {
-				mixin(tmp, props);
-			}
-			return tmp; // Object
+		function normalizeHeaderName(name) {
+			return name.toLowerCase()
+				.split('-')
+				.map(function (chunk) { return chunk.charAt(0).toUpperCase() + chunk.slice(1); })
+				.join('-');
 		}
 
-		return beget;
+		return normalizeHeaderName;
 
 	});
 
@@ -12226,9 +12359,6 @@ define('curl/plugin/css!theme/loader', ['curl/plugin/style!theme/loader'], funct
 	typeof define === 'function' && define.amd ? define : function (factory) { module.exports = factory(require); }
 	// Boilerplate for AMD and Node
 ));
-
-;define('theme/error', ['curl/plugin/style', 'require'], function (injector, require) { var text = "section.error h1 {\n\n   margin: 30px 0;\n   color: #666;\n   font-size: 1.2em;\n   color: #333;\n}\n\nsection.error {\n\n    background: url(\"http://renchi.qiniudn.com/bird-md.png\") no-repeat;\n    background-size: 150px;\n    background-position: 90% 90%;\n    padding: 30px 15px 110px 20px;\n    font-size: 16px;\n}\n\nsection.error .icon:before{\n\tcontent:'\\e60a';\n}"; if (0) text = injector.translateUrls(text, require.toUrl("")); return text; });
-define('curl/plugin/css!theme/error', ['curl/plugin/style!theme/error'], function (sheet) { return sheet; });
 /*
  * Copyright 2012-2013 the original author or authors
  * @license MIT, see LICENSE.txt for details
@@ -12361,6 +12491,54 @@ define('curl/plugin/css!theme/error', ['curl/plugin/style!theme/error'], functio
 	// Boilerplate for AMD and Node
 ));
 
+;define('theme/nav', ['curl/plugin/style', 'require'], function (injector, require) { var text = ".top-banner {\r\n    margin-bottom: 0;\r\n    background-color: #333;\r\n    border-bottom: 0;\r\n    position: relative;\r\n    min-height: 50px;\r\n    border: 1px solid transparent;\r\n    z-index: 1001;\r\n}\r\n\r\n.top-banner a {\r\n\r\n    color: #fff;\r\n}\r\n\r\n.top-banner .container {\r\n\r\n    margin-right: auto;\r\n    margin-left: auto;\r\n    padding-left: 15px;\r\n    padding-right: 15px;\r\n}\r\n\r\n.nav-header, .top-banner .navbar-collapse {\r\n\r\n    margin-right: -15px;\r\n    margin-left: -15px;\r\n}\r\n\r\n .nav-header:after, .navbar-collapse:after, .navbar-nav:after {\r\n    content:\"\";\r\n    display: table;\r\n    clear: both;\r\n}\r\n\r\n .menu-toggle {\r\n    position: relative;\r\n    float: right;\r\n    margin-right: 15px;\r\n    padding: 9px 10px;\r\n    margin-top: 8px;\r\n    margin-bottom: 8px;\r\n    background-color: transparent;\r\n    background-image: none;\r\n    border: 1px solid transparent;\r\n    border-radius: 4px;\r\n    cursor: pointer;\r\n}\r\n\r\n .icon-toggle {\r\n\r\n    display: block;\r\n    width: 22px;\r\n    height: 2px;\r\n    border-radius: 1px;\r\n    background: white;\r\n}\r\n .icon-toggle+.icon-toggle {\r\n    margin-top: 4px;\r\n}\r\n\r\n\r\n .navbar-brand {\r\n\r\n    font-family: third-font;\r\n    font-weight: 500;\r\n    float: left;\r\n    padding: 15px;\r\n    font-size: 18px;\r\n    line-height: 20px;\r\n    height: 50px;\r\n}\r\n\r\n .navbar-collapse {\r\n\r\n    padding-right: 15px;\r\n    padding-left: 15px;\r\n    border-top: 1px solid transparent;\r\n    box-shadow: inset 0 1px 0 rgba(255,255,255,.1);\r\n    height: 0;\r\n    overflow-y: hidden;\r\n    overflow-x: visible;\r\n}\r\n\r\n .navbar-nav {\r\n\r\n    margin: 7.5px -15px;\r\n    padding-left: 0;\r\n    list-style: none;\r\n}\r\n\r\n .navbar-nav>li {\r\n\r\n    position: relative;\r\n    display: block;\r\n}\r\n\r\n .navbar-nav>li>* {\r\n\r\n    position: relative;\r\n    display: block;\r\n    padding: 10px 15px;\r\n}\r\n\r\n .icon.tags:before {\r\n    content: '\\e605';\r\n }\r\n\r\n  .icon.about:before {\r\n    content: '\\e608';\r\n }\r\n  .icon.demos:before {\r\n    content: '\\e610';\r\n }\r\n\r\n .navbar-nav input {\r\n    display: block;\r\n    width: 100%;\r\n    height: 34px;\r\n    padding: 4px 8px;\r\n    font-size: 14px;\r\n    line-height: 1.42857143;\r\n    color: #555;\r\n    background: #eee;\r\n    border-color: #666;\r\n    background-image: none;\r\n    border: 1px solid #ccc;\r\n    border-radius: 4px;\r\n    box-shadow: inset 0 1px 1px rgba(0,0,0,.075);\r\n    -webkit-transition: border-color ease-in-out .15s,box-shadow ease-in-out .15s;\r\n    -ms-transition: border-color ease-in-out .15s,box-shadow ease-in-out .15s;\r\n    -moz-transition: border-color ease-in-out .15s,box-shadow ease-in-out .15s;\r\n    -o-transition: border-color ease-in-out .15s,box-shadow ease-in-out .15s;\r\n    transition: border-color ease-in-out .15s,box-shadow ease-in-out .15s;\r\n}\r\n\r\n .navbar-nav input:focus {\r\n\r\n    box-shadow: inset 0 1px 1px rgba(0,0,0,.075),0 0 11px rgba(255,255,255,.7);\r\n}\r\n\r\n\r\n@media (min-width: 768px) {\r\n\r\n    .top-banner .container {\r\n\r\n        width: 720px;\r\n    }\r\n\r\n     .menu-toggle {\r\n\r\n        display: none;\r\n    }\r\n\r\n     .nav-header {\r\n\r\n        float: left;\r\n    }\r\n\r\n     .navbar-collapse {\r\n\r\n        margin-right: 0;\r\n        margin-left: 0;\r\n        padding-left: 0;\r\n        padding-right: 0;\r\n        width: auto;\r\n        border-top: 0;\r\n        box-shadow: none;\r\n    }\r\n\r\n     .navbar-collapse.collapse {\r\n        display: block!important;\r\n        height: auto!important;\r\n        padding-bottom: 0;\r\n        overflow: visible!important;\r\n    }\r\n\r\n     .navbar-nav {\r\n\r\n        margin: 0;\r\n        float: right!important;\r\n    }\r\n\r\n     .navbar-nav>li {\r\n\r\n        float: left;\r\n    }\r\n\r\n     .navbar-nav>li>a {\r\n\r\n        padding-top: 15px;\r\n        padding-bottom: 15px;\r\n    }\r\n\r\n    .navbar-nav input {\r\n\r\n        padding-top: 2px;\r\n        padding-bottom: 2px;\r\n        width:310px;\r\n    }\r\n\r\n     .menu-toggle:hover {\r\n\r\n        background: #649def;\r\n    }\r\n}"; if (0) text = injector.translateUrls(text, require.toUrl("")); return text; });
+define('curl/plugin/css!theme/nav', ['curl/plugin/style!theme/nav'], function (sheet) { return sheet; });
+/*
+ * Copyright 2012 the original author or authors
+ * @license MIT, see LICENSE.txt for details
+ *
+ * @author Scott Andrews
+ */
+
+(function (define) {
+	'use strict';
+
+	// derived from dojo.delegate
+	define('rest/util/beget', ['require', './mixin'], function (require, $cram_r0) {
+
+		var mixin;
+
+		mixin = $cram_r0;
+
+		function Beget() {}
+
+		/**
+		 * Creates a new object with the provided object as it's prototype.
+		 * Additional properties may be mixed into the new object.
+		 *
+		 * @param {Object} obj the new object's prototype
+		 * @param {Object} [props] additional properties to mixin to the new object
+		 * @return {Object} the new object
+		 */
+		function beget(obj, props) {
+			Beget.prototype = obj;
+			var tmp = new Beget();
+			Beget.prototype = null;
+			if (props) {
+				mixin(tmp, props);
+			}
+			return tmp; // Object
+		}
+
+		return beget;
+
+	});
+
+}(
+	typeof define === 'function' && define.amd ? define : function (factory) { module.exports = factory(require); }
+	// Boilerplate for AMD and Node
+));
+
 ;define('app/partials/page', ['curl/plugin/text!app/tpls/postList.html', 'theme/postList', 'doT/doT', 'jquery/jquery'], function (
     tplStr, dumbStyle, doT, $
 ) {
@@ -12390,47 +12568,11 @@ define('curl/plugin/css!theme/error', ['curl/plugin/style!theme/error'], functio
     return exports;
 });
 
-;define('theme/tags', ['curl/plugin/style', 'require'], function (injector, require) { var text = "section.tag-list ul {\n\n\tpadding-left: 0;\n}\n\nsection.tag-list div {\n\n\tdisplay: inline-block;\n}\n\nsection.tag-list li {\n\n\tfont-size: 18px;\n\tfont-weight: bold;\n\tmargin:8px;\n\tlist-style: none;\n}\n\nsection.tag-list .icon:before {\n\n\tcontent: \"\\e603\";\n}\n\nsection.tag-list a {\n\n\tdisplay: inline-block;\n\tborder: 1px solid #333;\n\tborder-radius: 4px;\n\tpadding: .2em .7em .2em .4em;\n}\n\nsection.tag-list .count {\n\n\n\tdisplay: inline-block;\n\tvisibility: visible;\n\tmin-width: 10px;\n\tpadding: 3px 7px;\n\tfont-size: 12px;\n\tfont-weight: 700;\n\tcolor: #fff;\n\tline-height: 1;\n\tvertical-align: baseline;\n\twhite-space: nowrap;\n\ttext-align: center;\n\tbackground-color: #8cf2e3;\n\tborder-radius: 10px;\n\tposition: relative;\n\ttop: -1.5em;\n\tleft: -0.5em;\n}\n\nsection.tag-list div:hover .count {\n\n\tvisibility: visible;\n}\n\nsection.tag-list div:hover a {\n\n\tbackground: #8cf2e3;\n\tborder-color:#8cf2e3;\n\tcolor: #fff;\n}\n\n@media (min-width: 400px) {\n\n\tsection.tag-list li {\n\t\tdisplay: inline-block;\n\t}\n}"; if (0) text = injector.translateUrls(text, require.toUrl("")); return text; });
-define('curl/plugin/css!theme/tags', ['curl/plugin/style!theme/tags'], function (sheet) { return sheet; });
+;define('theme/foot', ['curl/plugin/style', 'require'], function (injector, require) { var text = "footer {\r\n    padding-top: 40px;\r\n    padding-bottom: 40px;\r\n    text-align: center;\r\n    background: url( 'http://renchi.qiniudn.com/birds.svg');\r\n    background-size:cover;\r\n    background-position: 50% 0%;\r\n    background-repeat: no-repeat;\r\n    background-color: #fff;\r\n    color: #000;\r\n    font-family: third-font, sans-serif;\r\n}\r\n\r\nfooter img {\r\n\r\n    width: 80px;\r\n    height: 80px;\r\n    border-radius: 80px;\r\n}\r\n\r\nfooter h1, footer h2, footer p {\r\n\r\n    margin:0;\r\n}\r\n\r\nfooter h1 {\r\n\r\n    font-size: 40px;\r\n}\r\n\r\nfooter p {\r\n\r\n    font-size: 20px;\r\n}"; if (0) text = injector.translateUrls(text, require.toUrl("")); return text; });
+define('curl/plugin/css!theme/foot', ['curl/plugin/style!theme/foot'], function (sheet) { return sheet; });
 
-;define('theme/post', ['curl/plugin/style', 'require'], function (injector, require) { var text = "code,\nkbd,\npre,\nsamp {\n  font-family: Menlo, Monaco, Consolas, \"Courier New\", monospace;\n}\ncode {\n  padding: 2px 4px;\n  font-size: 90%;\n  color: #c7254e;\n  white-space: pre-wrap;\n  background-color: #f9f2f4;\n  border-radius: 4px;\n}\nkbd {\n  padding: 2px 4px;\n  font-size: 90%;\n  color: #fff;\n  background-color: #333;\n  border-radius: 3px;\n  box-shadow: inset 0 -1px 0 rgba(0, 0, 0, .25);\n}\npre {\n  display: block;\n  padding: 9.5px;\n  margin: 0 0 10px;\n  font-size: 13px;\n  line-height: 1.42857143;\n  color: #333;\n  word-break: break-all;\n  word-wrap: break-word;\n  background-color: #f5f5f5;\n  border: 1px solid #ccc;\n  border-radius: 4px;\n}\npre code {\n  padding: 0;\n  font-size: inherit;\n  color: inherit;\n  white-space: pre-wrap;\n  background-color: transparent;\n  border-radius: 0;\n}\n\n.post {\n\n  color: #666;\n}\n\n.post p, .post li {\n\n  font-size: 13px;\n}\n\n.post .title h1 {\n  font-size: 30px;\n  color: #333;\n}\n\n.post .title p {\n\n  color: #aaa;\n  font-size: 12px;\n  margin: 5px 0 3px 3px;\n}\n\n.post .content {\n\n  margin: 10px 0 0 3px;\n  border-top: 1px solid #333;\n}\n\n.post .foot {\n  text-align: center;\n  padding: 15px 20px 50px 20px;\n  margin: 50px 0 0;\n}\n\n.post .foot p {\n\n  font-size: 15px;\n  font-weight: bold;\n  color: #333;\n  margin: 5px auto;\n}\n\n.post .foot ul {\n\n  padding:0;\n}\n\n.post .foot li {\n\n  list-style: none;\n  display: inline-block;\n  font-size: 11px;\n  margin:0 3px;\n}\n\n.post .foot a {\n\n  display: inline-block;\n  color: #333;\n  border: 1px solid #333;\n  border-radius: 4px;\n  padding: .2em .7em .15em .4em;\n}\n\n.post .foot a:hover {\n\n  background: #8cf2e3;\n  border-color:#8cf2e3;\n  color: #fff;\n}\n\n.post .icon:before {\n  content: '\\e603';\n}\n\n.post em {\n\n  font-size: 10px;\n  display: block;\n  font-weight: 900;\n  text-align: center;\n  margin-bottom: 10px;\n}\n\n.post a {\n\n  color: #4671e3;\n}"; if (0) text = injector.translateUrls(text, require.toUrl("")); return text; });
-define('curl/plugin/css!theme/post', ['curl/plugin/style!theme/post'], function (sheet) { return sheet; });
-
-;define('app/partials/loader', ['theme/loader', 'jquery/jquery'], function (
-	dumbStyle, $
-) {
-'use strict';
-
-	var exports = {};
-	var $view;
-
-	var main = function() {
-
-		$view = $( '<ul class="loader"><li></li><li></li><li></li><li></li><li></li><li></li></ul>' );
-
-		exports.show = show;
-		exports.hide = hide;
-	};
-
-	var show = function( container ) {
-
-		$( container ).append( $view );
-	};
-
-	var hide = function() {
-
-		$view.remove();
-	};
-
-	main();
-	return exports;
-});
-
-;define('theme/about', ['curl/plugin/style', 'require'], function (injector, require) { var text = "section.about {\n\twidth: 100%;\n\tmin-height: 600px;\n\ttext-align: center;\n\tpadding-left: 0;\n\tpadding-right: 0;\n\tcolor:#999;\n\tfont-size: 12px;\n}\n\nsection.about .content {\n\n\tmax-width: 620px;\n\tmargin:0 auto;\n\tpadding: 0 20px;\n}\n\nsection.about h1 {\n\tcolor:#333;\n\tfont-size: 200%;\n}\n\nsection.about h2 {\n\n\tfont-size: 120%;\n}\n\nsection.about ul {\n\n\tpadding-left: 0;\n}\n\nsection.about li {\n\n\tlist-style: none;\n\tdisplay: inline-block;\n\tfont-size: 140%;\n\tmargin-right: .5em;\n}\n\nsection.about img {\n\n\tmax-width: 50%;\n}\n\n.icon.beer:before {\n\n\tcontent: '\\e617';\n}\n\n.icon.git:before {\n\tcontent: '\\e601';\n}\n\n.icon.weibo:before {\n\n\tcontent: '\\e600';\n}\n\n.icon.fb:before {\n\n\tcontent: '\\e60d';\n}\n\n.icon.linkedin:before {\n\n\tcontent: '\\e613';\n}\n\n.icon.mail:before {\n\n\tcontent: '\\e614';\n}"; if (0) text = injector.translateUrls(text, require.toUrl("")); return text; });
-define('curl/plugin/css!theme/about', ['curl/plugin/style!theme/about'], function (sheet) { return sheet; });
-
-;define('app/partials/error', ['theme/error', 'jquery/jquery'], function (
-    dumbStyle, $
+;define('app/partials/foot', ['curl/plugin/text!app/tpls/foot.html', 'theme/foot', 'jquery/jquery'], function (
+    footTplStr, dumbStyle, $
 ) {
 'use strict';
 
@@ -12441,28 +12583,31 @@ define('curl/plugin/css!theme/about', ['curl/plugin/style!theme/about'], functio
      */
 
     var exports = {};
-    var $viewDom;
+    var $foot;
 
     var main = function() {
 
-        exports.init = init;
-        exports.render = render;
+        exports.init   = init;
+        exports.getDom = getDom;
     };
 
     var init = function( container ) {
 
-        $viewDom = $( container );
+        $foot = $( footTplStr ).appendTo( container );
     };
 
-    var render = function( msg ) {
+    var getDom = function() {
 
-        $viewDom.html( '<section class="error"><h1>糟糕，程序出现了问题。</h1><span class="icon confuse"></span>'+ msg + '</section>' );
+        return $foot;
     };
 
     main();
 
     return exports;
 });
+
+;define('theme/loader', ['curl/plugin/style', 'require'], function (injector, require) { var text = ".loader {\r\n\tposition: fixed;\r\n\tz-index: 9999;\r\n\tleft:50%;\r\n\ttop:50%;\r\n\tmargin-top: -60px;\r\n\tmargin-left: -40px;\r\n\twidth: 90px;\r\n\theight: 60px;\r\n  \tlist-style: none;\r\n  \tpadding: 0;\r\n}\r\n\r\n@-webkit-keyframes 'loadbars' {\r\n\t0%{\r\n\t\theight: 10px;\r\n\t\tmargin-top: 30px;\r\n\t}\r\n\t50%{\r\n\t\theight:60px;\r\n\t\tmargin-top: 0px;\r\n\t}\r\n\t100%{\r\n\t\theight: 10px;\r\n\t\tmargin-top: 30px;\r\n\t}\r\n}\r\n\r\n@-ms-keyframes 'loadbars' {\r\n\t0%{\r\n\t\theight: 10px;\r\n\t\tmargin-top: 25px;\r\n\t}\r\n\t50%{\r\n\t\theight:50px;\r\n\t\tmargin-top: 0px;\r\n\t}\r\n\t100%{\r\n\t\theight: 10px;\r\n\t\tmargin-top: 25px;\r\n\t}\r\n}\r\n\r\n@-o-keyframes 'loadbars' {\r\n\t0%{\r\n\t\theight: 10px;\r\n\t\tmargin-top: 25px;\r\n\t}\r\n\t50%{\r\n\t\theight:50px;\r\n\t\tmargin-top: 0px;\r\n\t}\r\n\t100%{\r\n\t\theight: 10px;\r\n\t\tmargin-top: 25px;\r\n\t}\r\n}\r\n\r\n@-moz-keyframes 'loadbars' {\r\n\t0%{\r\n\t\theight: 10px;\r\n\t\tmargin-top: 25px;\r\n\t}\r\n\t50%{\r\n\t\theight:50px;\r\n\t\tmargin-top: 0px;\r\n\t}\r\n\t100%{\r\n\t\theight: 10px;\r\n\t\tmargin-top: 25px;\r\n\t}\r\n}\r\n\r\n@keyframes 'loadbars' {\r\n\t0%{\r\n\t\theight: 10px;\r\n\t\tmargin-top: 25px;\r\n\t}\r\n\t50%{\r\n\t\theight:50px;\r\n\t\tmargin-top: 0px;\r\n\t}\r\n\t100%{\r\n\t\theight: 10px;\r\n\t\tmargin-top: 25px;\r\n\t}\r\n}\r\n\r\n.loader li{\r\n\tbackground-color: #666;\r\n\twidth: 10px;\r\n\theight: 10px;\r\n\tfloat: right;\r\n\tmargin-right: 5px;\r\n    box-shadow: 0px 100px 20px rgba(0,0,0,0.4);\r\n}\r\n.loader li:first-child{\r\n\t-webkit-animation: loadbars .6s ease-in-out infinite 0s;\r\n}\r\n.loader li:nth-child(2){\r\n\t-webkit-animation: loadbars .6s ease-in-out infinite -0.1s;\r\n}\r\n.loader li:nth-child(3){\r\n\t-webkit-animation: loadbars .6s ease-in-out infinite -0.2s;\r\n}\r\n.loader li:nth-child(4){\r\n\t-webkit-animation: loadbars .6s ease-in-out infinite -0.3s;\r\n}\r\n.loader li:nth-child(5){\r\n\t-webkit-animation: loadbars .6s ease-in-out infinite -0.4s;\r\n}\r\n.loader li:nth-child(6){\r\n\t-webkit-animation: loadbars .6s ease-in-out infinite -0.5s;\r\n}"; if (0) text = injector.translateUrls(text, require.toUrl("")); return text; });
+define('curl/plugin/css!theme/loader', ['curl/plugin/style!theme/loader'], function (sheet) { return sheet; });
 
 ;define('app/utils/transition', ['jquery/jquery'], function (
     $
@@ -12517,62 +12662,30 @@ define('curl/plugin/css!theme/about', ['curl/plugin/style!theme/about'], functio
     return null;
 });
 
-;define('app/partials/tags', ['curl/plugin/text!app/tpls/tags.html', 'theme/tags', 'doT/doT', 'jquery/jquery'], function (
-	tplStr, dumbStyle, doT, $
+;define('app/partials/loader', ['theme/loader', 'jquery/jquery'], function (
+	dumbStyle, $
 ) {
 'use strict';
 
 	var exports = {};
 	var $view;
-	var tpl = doT.template( tplStr );
 
 	var main = function() {
 
-		exports.init = init;
-		exports.render = render;
+		$view = $( '<ul class="loader"><li></li><li></li><li></li><li></li><li></li><li></li></ul>' );
+
+		exports.show = show;
+		exports.hide = hide;
 	};
 
-	var init = function( view ) {
+	var show = function( container ) {
 
-		$view = $( view );
-		if ( !('ontouchstart' in document.body ) ) {
-			$( '<style>section.tag-list .count {visibility:hidden;}</style>' ).appendTo( $( 'head' ) );
-		}
+		$( container ).append( $view );
 	};
 
-	var render = function( data ) {
+	var hide = function() {
 
-		$view.html( tpl( data ) );
-	};
-
-	main();
-	return exports;
-});
-
-;define('app/partials/post', ['curl/plugin/text!app/tpls/post.html', 'theme/post', 'doT/doT', 'jquery/jquery'], function (
-	tplStr, dumbStyle, doT, $
-) {
-'use strict';
-
-	var exports = {};
-	var $view;
-	var tpl = doT.template( tplStr );
-
-	var main = function() {
-
-		exports.init = init;
-		exports.render = render;
-	};
-
-	var init = function( view ) {
-
-		$view = $( view );
-	};
-
-	var render = function( data ) {
-
-		$view.html( tpl( data ) );
-		MathJax.Hub.Queue([ 'Typeset', MathJax.Hub, $( 'section.post')[0] ]);
+		$view.remove();
 	};
 
 	main();
@@ -12807,41 +12920,8 @@ define('curl/plugin/css!theme/about', ['curl/plugin/style!theme/about'], functio
 	// Boilerplate for AMD and Node
 ));
 
-;define('app/partials/about', ['curl/plugin/text!app/tpls/about.html', 'theme/about', 'jquery/jquery'], function (
-	tplStr, dumbStyle, $
-) {
-'use strict';
-
-	var exports = {};
-	var $view;
-
-	var main = function() {
-
-		exports.init = init;
-		exports.render = render;
-	};
-
-	var init = function( view ) {
-
-		window.onresize = _expandViewDom;
-		window.onorientationchange = _expandViewDom;
-		$view = $( view );
-	};
-
-	var render = function() {
-
-		$view.html( tplStr );
-		_expandViewDom();
-	};
-
-	var _expandViewDom = function() {
-
-		$( 'section.about', $view ).css( 'minHeight', $view[0].offsetHeight );
-	};
-
-	main();
-	return exports;
-});
+;define('theme/error', ['curl/plugin/style', 'require'], function (injector, require) { var text = "section.error h1 {\r\n\r\n   margin: 30px 0;\r\n   color: #666;\r\n   font-size: 1.2em;\r\n   color: #333;\r\n}\r\n\r\nsection.error {\r\n\r\n    background: url(\"http://renchi.qiniudn.com/bird-md.png\") no-repeat;\r\n    background-size: 150px;\r\n    background-position: 90% 90%;\r\n    padding: 30px 15px 110px 20px;\r\n    font-size: 16px;\r\n}\r\n\r\nsection.error .icon:before{\r\n\tcontent:'\\e60a';\r\n}"; if (0) text = injector.translateUrls(text, require.toUrl("")); return text; });
+define('curl/plugin/css!theme/error', ['curl/plugin/style!theme/error'], function (sheet) { return sheet; });
 
 ;define('app/partials/nav', ['curl/plugin/text!app/tpls/nav.html', 'app/utils/transition', 'theme/nav', 'jquery/jquery'], function (
     tplStr, transition, dumbStyle, $
@@ -13080,8 +13160,43 @@ define('curl/plugin/css!theme/about', ['curl/plugin/style!theme/about'], functio
 	// Boilerplate for AMD and Node
 ));
 
-;define('theme/gotop', ['curl/plugin/style', 'require'], function (injector, require) { var text = ".go-top .icon:before {\n\tcontent:'\\e612';\n}\n\n.go-top {\n\tdisplay: none;\n\tposition: fixed;\n\tz-index: 9999;\n\ttop: 8px;\n\tright: 8px;\n\tcolor:#333;\n\tfont-size: 20px;\n\topacity: 0;\n\theight: 0;\n\ttext-shadow: 0 40px 16px rgba(0,0,0,0.4);\n\tcursor: pointer;\n}\n\n@media (min-width: 768px) {\n\n\t.go-top:hover {\n\t\tcolor: #8cf2e3;\n\t}\n}"; if (0) text = injector.translateUrls(text, require.toUrl("")); return text; });
-define('curl/plugin/css!theme/gotop', ['curl/plugin/style!theme/gotop'], function (sheet) { return sheet; });
+;define('app/partials/error', ['theme/error', 'jquery/jquery'], function (
+    dumbStyle, $
+) {
+'use strict';
+
+    /**
+     * title
+     * @created date
+     * @author chillicomputer@gmail.com
+     */
+
+    var exports = {};
+    var $viewDom;
+
+    var main = function() {
+
+        exports.init = init;
+        exports.render = render;
+    };
+
+    var init = function( container ) {
+
+        $viewDom = $( container );
+    };
+
+    var render = function( msg ) {
+
+        $viewDom.html( '<section class="error"><h1>糟糕，程序出现了问题。</h1><span class="icon confuse"></span>'+ msg + '</section>' );
+    };
+
+    main();
+
+    return exports;
+});
+
+;define('theme/tags', ['curl/plugin/style', 'require'], function (injector, require) { var text = "section.tag-list ul {\r\n\r\n\tpadding-left: 0;\r\n}\r\n\r\nsection.tag-list div {\r\n\r\n\tdisplay: inline-block;\r\n}\r\n\r\nsection.tag-list li {\r\n\r\n\tfont-size: 18px;\r\n\tfont-weight: bold;\r\n\tmargin:8px;\r\n\tlist-style: none;\r\n}\r\n\r\nsection.tag-list .icon:before {\r\n\r\n\tcontent: \"\\e603\";\r\n}\r\n\r\nsection.tag-list a {\r\n\r\n\tdisplay: inline-block;\r\n\tborder: 1px solid #333;\r\n\tborder-radius: 4px;\r\n\tpadding: .2em .7em .2em .4em;\r\n}\r\n\r\nsection.tag-list .count {\r\n\r\n\r\n\tdisplay: inline-block;\r\n\tvisibility: visible;\r\n\tmin-width: 10px;\r\n\tpadding: 3px 7px;\r\n\tfont-size: 12px;\r\n\tfont-weight: 700;\r\n\tcolor: #fff;\r\n\tline-height: 1;\r\n\tvertical-align: baseline;\r\n\twhite-space: nowrap;\r\n\ttext-align: center;\r\n\tbackground-color: #8cf2e3;\r\n\tborder-radius: 10px;\r\n\tposition: relative;\r\n\ttop: -1.5em;\r\n\tleft: -0.5em;\r\n}\r\n\r\nsection.tag-list div:hover .count {\r\n\r\n\tvisibility: visible;\r\n}\r\n\r\nsection.tag-list div:hover a {\r\n\r\n\tbackground: #8cf2e3;\r\n\tborder-color:#8cf2e3;\r\n\tcolor: #fff;\r\n}\r\n\r\n@media (min-width: 400px) {\r\n\r\n\tsection.tag-list li {\r\n\t\tdisplay: inline-block;\r\n\t}\r\n}"; if (0) text = injector.translateUrls(text, require.toUrl("")); return text; });
+define('curl/plugin/css!theme/tags', ['curl/plugin/style!theme/tags'], function (sheet) { return sheet; });
 /*
  * Copyright 2012-2014 the original author or authors
  * @license MIT, see LICENSE.txt for details
@@ -13206,89 +13321,40 @@ define('curl/plugin/css!theme/gotop', ['curl/plugin/style!theme/gotop'], functio
 	// Boilerplate for AMD and Node
 ));
 
-;define('app/partials/gotop', ['theme/gotop', 'tween/Tween.js', 'app/utils/animationFrame', 'jquery/jquery'], function (
-	dumbStyle, TWEEN, animationFrame, $
+;define('app/partials/tags', ['curl/plugin/text!app/tpls/tags.html', 'theme/tags', 'doT/doT', 'jquery/jquery'], function (
+	tplStr, dumbStyle, doT, $
 ) {
 'use strict';
 
-	var $view;
 	var exports = {};
-	var _timer;
-	var _request = animationFrame.request;
+	var $view;
+	var tpl = doT.template( tplStr );
 
 	var main = function() {
 
-		setTimeout( function() {
-
-			$view = $( '<div class="go-top"><span class="icon"></span></div>' ).appendTo( $( 'body') );
-
-			$view.click( function() {
-
-				scrollToTop();
-			});
-
-			window.onscroll = function( e ) {
-
-				if ( !$view.data( 'show' ) && window.scrollY > window.innerHeight ) {
-
-					$view.show().data( 'show', 1 );
-
-					if ( /Mobile/.test(navigator.userAgent) ) $view.css( 'opacity', 1 );
-					else {
-						_timer && clearTimeout( _timer );
-						_timer = setTimeout( function() {
-							$view.animate( { opacity: 1 }, 350 );
-						}, 200 );
-					}
-				}
-
-				if ( $view.data( 'show' ) && window.scrollY <= window.innerHeight ) {
-
-					$view.data( 'show', 0 );
-
-					if ( /Mobile/.test(navigator.userAgent) ) $view.hide();
-					else {
-						_timer && clearTimeout( _timer );
-						_timer = setTimeout( function() {
-							$view.animate( { opacity: 0}, 350, function() {
-								$view.hide();
-							});
-						}, 200 );
-					}
-				}
-			};
-
-			exports.scrollToTop = scrollToTop;
-		}, 0);
+		exports.init = init;
+		exports.render = render;
 	};
 
-	var scrollToTop = function() {
+	var init = function( view ) {
 
-		var position = { y: window.scrollY };
-		var update = function() {
+		$view = $( view );
+		if ( !('ontouchstart' in document.body ) ) {
+			$( '<style>section.tag-list .count {visibility:hidden;}</style>' ).appendTo( $( 'head' ) );
+		}
+	};
 
-			window.scrollTo( 0, position.y );
-		};
-		var tween = new TWEEN.Tween( position )
-			.to( { y: 0 }, 600 )
-			.delay( 50 )
-			.easing( TWEEN.Easing.Cubic.InOut )
-			.onUpdate( update );
+	var render = function( data ) {
 
-		var animate = function() {
-
-			position.y > 0 && _request( animate );
-			TWEEN.update();
-		};
-
-		tween.start();
-		animate();
+		$view.html( tpl( data ) );
 	};
 
 	main();
-
 	return exports;
 });
+
+;define('theme/about', ['curl/plugin/style', 'require'], function (injector, require) { var text = "section.about {\r\n\twidth: 100%;\r\n\tmin-height: 600px;\r\n\ttext-align: center;\r\n\tpadding-left: 0;\r\n\tpadding-right: 0;\r\n\tcolor:#999;\r\n\tfont-size: 12px;\r\n}\r\n\r\nsection.about .content {\r\n\r\n\tmax-width: 620px;\r\n\tmargin:0 auto;\r\n\tpadding: 0 20px;\r\n}\r\n\r\nsection.about h1 {\r\n\tcolor:#333;\r\n\tfont-size: 200%;\r\n}\r\n\r\nsection.about h2 {\r\n\r\n\tfont-size: 120%;\r\n}\r\n\r\nsection.about ul {\r\n\r\n\tpadding-left: 0;\r\n}\r\n\r\nsection.about li {\r\n\r\n\tlist-style: none;\r\n\tdisplay: inline-block;\r\n\tfont-size: 140%;\r\n\tmargin-right: .5em;\r\n}\r\n\r\nsection.about img {\r\n\r\n\tmax-width: 50%;\r\n}\r\n\r\n.icon.beer:before {\r\n\r\n\tcontent: '\\e617';\r\n}\r\n\r\n.icon.git:before {\r\n\tcontent: '\\e601';\r\n}\r\n\r\n.icon.weibo:before {\r\n\r\n\tcontent: '\\e600';\r\n}\r\n\r\n.icon.fb:before {\r\n\r\n\tcontent: '\\e60d';\r\n}\r\n\r\n.icon.linkedin:before {\r\n\r\n\tcontent: '\\e613';\r\n}\r\n\r\n.icon.mail:before {\r\n\r\n\tcontent: '\\e614';\r\n}"; if (0) text = injector.translateUrls(text, require.toUrl("")); return text; });
+define('curl/plugin/css!theme/about', ['curl/plugin/style!theme/about'], function (sheet) { return sheet; });
 /*
  * Copyright 2012-2013 the original author or authors
  * @license MIT, see LICENSE.txt for details
@@ -13469,6 +13535,45 @@ define('curl/plugin/css!theme/gotop', ['curl/plugin/style!theme/gotop'], functio
 	typeof define === 'function' && define.amd ? define : function (factory) { module.exports = factory(require); }
 	// Boilerplate for AMD and Node
 ));
+
+;define('theme/gotop', ['curl/plugin/style', 'require'], function (injector, require) { var text = ".go-top .icon:before {\r\n\tcontent:'\\e612';\r\n}\r\n\r\n.go-top {\r\n\tdisplay: none;\r\n\tposition: fixed;\r\n\tz-index: 9999;\r\n\ttop: 8px;\r\n\tright: 8px;\r\n\tcolor:#333;\r\n\tfont-size: 20px;\r\n\topacity: 0;\r\n\theight: 0;\r\n\ttext-shadow: 0 40px 16px rgba(0,0,0,0.4);\r\n\tcursor: pointer;\r\n}\r\n\r\n@media (min-width: 768px) {\r\n\r\n\t.go-top:hover {\r\n\t\tcolor: #8cf2e3;\r\n\t}\r\n}"; if (0) text = injector.translateUrls(text, require.toUrl("")); return text; });
+define('curl/plugin/css!theme/gotop', ['curl/plugin/style!theme/gotop'], function (sheet) { return sheet; });
+
+;define('app/partials/about', ['curl/plugin/text!app/tpls/about.html', 'theme/about', 'jquery/jquery'], function (
+	tplStr, dumbStyle, $
+) {
+'use strict';
+
+	var exports = {};
+	var $view;
+
+	var main = function() {
+
+		exports.init = init;
+		exports.render = render;
+	};
+
+	var init = function( view ) {
+
+		window.onresize = _expandViewDom;
+		window.onorientationchange = _expandViewDom;
+		$view = $( view );
+	};
+
+	var render = function() {
+
+		$view.html( tplStr );
+		_expandViewDom();
+	};
+
+	var _expandViewDom = function() {
+
+		$( 'section.about', $view ).css( 'minHeight', $view[0].offsetHeight );
+	};
+
+	main();
+	return exports;
+});
 /*
  * Copyright 2012-2013 the original author or authors
  * @license MIT, see LICENSE.txt for details
@@ -13581,6 +13686,93 @@ define('curl/plugin/css!theme/gotop', ['curl/plugin/style!theme/gotop'], functio
 	// Boilerplate for AMD and Node
 ));
 
+;define('theme/post', ['curl/plugin/style', 'require'], function (injector, require) { var text = "code,\r\nkbd,\r\npre,\r\nsamp {\r\n  font-family: Menlo, Monaco, Consolas, \"Courier New\", monospace;\r\n}\r\ncode {\r\n  padding: 2px 4px;\r\n  font-size: 90%;\r\n  color: #c7254e;\r\n  white-space: pre-wrap;\r\n  background-color: #f9f2f4;\r\n  border-radius: 4px;\r\n}\r\nkbd {\r\n  padding: 2px 4px;\r\n  font-size: 90%;\r\n  color: #fff;\r\n  background-color: #333;\r\n  border-radius: 3px;\r\n  box-shadow: inset 0 -1px 0 rgba(0, 0, 0, .25);\r\n}\r\npre {\r\n  display: block;\r\n  padding: 9.5px;\r\n  margin: 0 0 10px;\r\n  font-size: 13px;\r\n  line-height: 1.42857143;\r\n  color: #333;\r\n  word-break: break-all;\r\n  word-wrap: break-word;\r\n  background-color: #f5f5f5;\r\n  border: 1px solid #ccc;\r\n  border-radius: 4px;\r\n}\r\npre code {\r\n  padding: 0;\r\n  font-size: inherit;\r\n  color: inherit;\r\n  white-space: pre-wrap;\r\n  background-color: transparent;\r\n  border-radius: 0;\r\n}\r\n\r\n.post {\r\n\r\n  color: #666;\r\n}\r\n\r\n.post p, .post li {\r\n\r\n  font-size: 13px;\r\n}\r\n\r\n.post .title h1 {\r\n  font-size: 30px;\r\n  color: #333;\r\n}\r\n\r\n.post .title p {\r\n\r\n  color: #aaa;\r\n  font-size: 12px;\r\n  margin: 5px 0 3px 3px;\r\n}\r\n\r\n.post .content {\r\n\r\n  margin: 10px 0 0 3px;\r\n  border-top: 1px solid #333;\r\n}\r\n\r\n.post .foot {\r\n  text-align: center;\r\n  padding: 15px 20px 50px 20px;\r\n  margin: 50px 0 0;\r\n}\r\n\r\n.post .foot p {\r\n\r\n  font-size: 15px;\r\n  font-weight: bold;\r\n  color: #333;\r\n  margin: 5px auto;\r\n}\r\n\r\n.post .foot ul {\r\n\r\n  padding:0;\r\n}\r\n\r\n.post .foot li {\r\n\r\n  list-style: none;\r\n  display: inline-block;\r\n  font-size: 11px;\r\n  margin:0 3px;\r\n}\r\n\r\n.post .foot a {\r\n\r\n  display: inline-block;\r\n  color: #333;\r\n  border: 1px solid #333;\r\n  border-radius: 4px;\r\n  padding: .2em .7em .15em .4em;\r\n}\r\n\r\n.post .foot a:hover {\r\n\r\n  background: #8cf2e3;\r\n  border-color:#8cf2e3;\r\n  color: #fff;\r\n}\r\n\r\n.post .icon:before {\r\n  content: '\\e603';\r\n}\r\n\r\n.post em {\r\n\r\n  font-size: 10px;\r\n  display: block;\r\n  font-weight: 900;\r\n  text-align: center;\r\n  margin-bottom: 10px;\r\n}\r\n\r\n.post a {\r\n\r\n  color: #4671e3;\r\n}"; if (0) text = injector.translateUrls(text, require.toUrl("")); return text; });
+define('curl/plugin/css!theme/post', ['curl/plugin/style!theme/post'], function (sheet) { return sheet; });
+
+;define('app/partials/gotop', ['theme/gotop', 'tween/Tween.js', 'app/utils/animationFrame', 'jquery/jquery'], function (
+	dumbStyle, TWEEN, animationFrame, $
+) {
+'use strict';
+
+	var $view;
+	var exports = {};
+	var _timer;
+	var _request = animationFrame.request;
+
+	var main = function() {
+
+		setTimeout( function() {
+
+			$view = $( '<div class="go-top"><span class="icon"></span></div>' ).appendTo( $( 'body') );
+
+			$view.click( function() {
+
+				scrollToTop();
+			});
+
+			window.onscroll = function( e ) {
+
+				if ( !$view.data( 'show' ) && window.scrollY > window.innerHeight ) {
+
+					$view.show().data( 'show', 1 );
+
+					if ( /Mobile/.test(navigator.userAgent) ) $view.css( 'opacity', 1 );
+					else {
+						_timer && clearTimeout( _timer );
+						_timer = setTimeout( function() {
+							$view.animate( { opacity: 1 }, 350 );
+						}, 200 );
+					}
+				}
+
+				if ( $view.data( 'show' ) && window.scrollY <= window.innerHeight ) {
+
+					$view.data( 'show', 0 );
+
+					if ( /Mobile/.test(navigator.userAgent) ) $view.hide();
+					else {
+						_timer && clearTimeout( _timer );
+						_timer = setTimeout( function() {
+							$view.animate( { opacity: 0}, 350, function() {
+								$view.hide();
+							});
+						}, 200 );
+					}
+				}
+			};
+
+			exports.scrollToTop = scrollToTop;
+		}, 0);
+	};
+
+	var scrollToTop = function() {
+
+		var position = { y: window.scrollY };
+		var update = function() {
+
+			window.scrollTo( 0, position.y );
+		};
+		var tween = new TWEEN.Tween( position )
+			.to( { y: 0 }, 600 )
+			.delay( 50 )
+			.easing( TWEEN.Easing.Cubic.InOut )
+			.onUpdate( update );
+
+		var animate = function() {
+
+			position.y > 0 && _request( animate );
+			TWEEN.update();
+		};
+
+		tween.start();
+		animate();
+	};
+
+	main();
+
+	return exports;
+});
+
 ;define('app/model', ['rest/rest', 'rest/interceptor/mime', 'jquery/jquery'], function (
     rest, mime, $
 ) {
@@ -13633,7 +13825,7 @@ define('curl/plugin/css!theme/gotop', ['curl/plugin/style!theme/gotop'], functio
 
                 else {
 
-                    throw _parseNetError( res );
+                    throw _parseRespError( res );
                 }
             }, function( res ) {
 
@@ -13672,11 +13864,16 @@ define('curl/plugin/css!theme/gotop', ['curl/plugin/style!theme/gotop'], functio
             };
         }
 
-        return _fetchData( { path: RES_PAGES + page } ).then( function( data ) {
+        var promise = _fetchData( { path: RES_PAGES + page } );
+        var anotherPromise = promise.then( function( data ) {
 
             pageCache[page] = data;
             return getListsByPage( page );
         });
+
+        anotherPromise._request = promise._request;
+
+        return anotherPromise;
     };
 
     var getPost = function( slug ) {
@@ -13684,22 +13881,32 @@ define('curl/plugin/css!theme/gotop', ['curl/plugin/style!theme/gotop'], functio
         if ( !slug ) throw new Error( ERROR_CODE.NOT_FOUND );
         if ( postCache[ slug ] ) return postCache[ slug ];
 
-        return _fetchData( { path: RES_POST + slug } ).then( function( data ) {
+        var promise = _fetchData( { path: RES_POST + slug } );
+        var anotherPromise = promise.then( function( data ) {
 
             postCache[ slug ] = data;
             return getPost( slug );
         });
+
+        anotherPromise._request = promise._request;
+
+        return anotherPromise;
     };
 
     var getTags = function() {
 
         if ( tagsCache ) { return tagsCache; }
 
-        return _fetchData( { path: RES_TAGS } ).then( function( data ) {
+        var promise = _fetchData( { path: RES_TAGS } );
+        var anotherPromise = promise.then( function( data ) {
 
             tagsCache = data;
             return getTags();
         });
+
+        anotherPromise._request = promise._request;
+
+        return anotherPromise;
     };
 
     var getListsByTag = function( slug ) {
@@ -13716,11 +13923,17 @@ define('curl/plugin/css!theme/gotop', ['curl/plugin/style!theme/gotop'], functio
             };
         }
 
-        return _fetchData( { path: RES_TAGS + slug } ).then( function( data ) {
+        var promise = _fetchData( { path: RES_TAGS + slug } );
+
+        var anotherPromise = promise.then( function( data ) {
 
             tagPageCache[ slug ] = data;
             return getListsByTag( slug );
         });
+
+        anotherPromise._request = promise._request;
+
+        return anotherPromise;
     };
 
     var watch = function( event, handler ) {
@@ -13730,6 +13943,42 @@ define('curl/plugin/css!theme/gotop', ['curl/plugin/style!theme/gotop'], functio
 
     main();
     return exports;
+});
+
+;define('app/partials/post', ['curl/plugin/text!app/tpls/post.html', 'theme/post', 'doT/doT', 'jquery/jquery'], function (
+	tplStr, dumbStyle, doT, $
+) {
+'use strict';
+
+	var exports = {};
+	var $view;
+	var tpl = doT.template( tplStr );
+
+	var main = function() {
+
+		exports.init = init;
+		exports.render = render;
+	};
+
+	var init = function( view ) {
+
+		$view = $( view );
+	};
+
+	var render = function( data ) {
+
+		$view.html( tpl( data ) );
+
+		// MathJax
+
+		curl( ['js!mathjax'] ).then( function() {
+
+			MathJax.Hub.Queue([ 'Typeset', MathJax.Hub, $( 'section.post')[0] ]);
+		});
+	};
+
+	main();
+	return exports;
 });
 
 ;define('app/views', ['app/partials/page', 'app/partials/nav', 'app/partials/foot', 'app/partials/loader', 'app/partials/error', 'app/partials/tags', 'app/partials/post', 'app/partials/about', 'app/partials/gotop', 'app/model', 'app/utils/uid', 'jquery/jquery'], function (
@@ -14010,16 +14259,14 @@ define('curl/plugin/css!theme/gotop', ['curl/plugin/style!theme/gotop'], functio
 
             console.log( 'about' );
 
-            _ifError( function() {
 
-                _flushViews( null, function( err, data ) {
+            _flushViews( null, function( err, data ) {
 
-                    _collapseNav( function() {
+                _collapseNav( function() {
 
-                        _initFirstScreen( function() {
+                    _initFirstScreen( function() {
 
-                            about.render();
-                        });
+                        about.render();
                     });
                 });
             });

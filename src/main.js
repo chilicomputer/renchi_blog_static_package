@@ -5,6 +5,10 @@
 	curl({
 
 		baseUrl: '/',
+		host: window.STATIC_HOST,
+		paths: {
+			'mathjax': 'http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML'
+		},
 		packages: [
 
 			{

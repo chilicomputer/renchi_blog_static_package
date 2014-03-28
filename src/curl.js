@@ -679,7 +679,8 @@
 		},
 
 		resolveUrl: function (path, cfg) {
-			var baseUrl = cfg.baseUrl;
+
+			var baseUrl = ( !/https?:\/\//.test( cfg.baseUrl ) ? cfg.host : '' ) + cfg.baseUrl;
 			return baseUrl && !isAbsUrl(path) ? joinPath(baseUrl, path) : path;
 		},
 
@@ -1318,6 +1319,7 @@
 	// default configs
 	userCfg = {
 		baseUrl: '',
+		host: '',
 		pluginPath: 'curl/plugin',
 		dontAddFileExt: dontAddExtRx,
 		paths: {},

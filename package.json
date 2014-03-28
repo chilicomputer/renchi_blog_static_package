@@ -14,7 +14,7 @@
 	},
 	"scripts": {
 		"start": "node app.js",
-		"cram": "cram src/main.js -r ./src -o dist/main.js"
+		"cram": "cram src/main.js -r ./src -o dist/main.js --include curl/plugin/js"
 	},
 	"readme":"/dist for online codes, /src for dev codes, /node_modules for dev tools"
 }

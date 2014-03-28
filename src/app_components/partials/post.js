@@ -29,7 +29,13 @@ define([
 	var render = function( data ) {
 
 		$view.html( tpl( data ) );
-		MathJax.Hub.Queue([ 'Typeset', MathJax.Hub, $( 'section.post')[0] ]);
+
+		// MathJax
+
+		curl( ['js!mathjax'] ).then( function() {
+
+			MathJax.Hub.Queue([ 'Typeset', MathJax.Hub, $( 'section.post')[0] ]);
+		});
 	};
 
 	main();
