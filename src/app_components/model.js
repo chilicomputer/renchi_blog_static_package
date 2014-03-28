@@ -56,7 +56,7 @@ define([
 
                 else {
 
-                    throw _parseNetError( res );
+                    throw _parseRespError( res );
                 }
             }, function( res ) {
 
@@ -95,11 +95,16 @@ define([
             };
         }
 
-        return _fetchData( { path: RES_PAGES + page } ).then( function( data ) {
+        var promise = _fetchData( { path: RES_PAGES + page } );
+        var anotherPromise = promise.then( function( data ) {
 
             pageCache[page] = data;
             return getListsByPage( page );
         });
+
+        anotherPromise._request = promise._request;
+
+        return anotherPromise;
     };
 
     var getPost = function( slug ) {
@@ -107,22 +112,32 @@ define([
         if ( !slug ) throw new Error( ERROR_CODE.NOT_FOUND );
         if ( postCache[ slug ] ) return postCache[ slug ];
 
-        return _fetchData( { path: RES_POST + slug } ).then( function( data ) {
+        var promise = _fetchData( { path: RES_POST + slug } );
+        var anotherPromise = promise.then( function( data ) {
 
             postCache[ slug ] = data;
             return getPost( slug );
         });
+
+        anotherPromise._request = promise._request;
+
+        return anotherPromise;
     };
 
     var getTags = function() {
 
         if ( tagsCache ) { return tagsCache; }
 
-        return _fetchData( { path: RES_TAGS } ).then( function( data ) {
+        var promise = _fetchData( { path: RES_TAGS } );
+        var anotherPromise = promise.then( function( data ) {
 
             tagsCache = data;
             return getTags();
         });
+
+        anotherPromise._request = promise._request;
+
+        return anotherPromise;
     };
 
     var getListsByTag = function( slug ) {
@@ -139,11 +154,17 @@ define([
             };
         }
 
-        return _fetchData( { path: RES_TAGS + slug } ).then( function( data ) {
+        var promise = _fetchData( { path: RES_TAGS + slug } );
+
+        var anotherPromise = promise.then( function( data ) {
 
             tagPageCache[ slug ] = data;
             return getListsByTag( slug );
         });
+
+        anotherPromise._request = promise._request;
+
+        return anotherPromise;
     };
 
     var watch = function( event, handler ) {

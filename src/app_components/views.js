@@ -304,16 +304,14 @@ define([
 
             console.log( 'about' );
 
-            _ifError( function() {
 
-                _flushViews( null, function( err, data ) {
+            _flushViews( null, function( err, data ) {
 
-                    _collapseNav( function() {
+                _collapseNav( function() {
 
-                        _initFirstScreen( function() {
+                    _initFirstScreen( function() {
 
-                            about.render();
-                        });
+                        about.render();
                     });
                 });
             });
