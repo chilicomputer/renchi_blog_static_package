@@ -8,6 +8,14 @@
     <span><span class="icon tag"></span>{{= it.tag}}</span>
 </h1>
 {{?}}
+{{? it.query}}
+<h1 class="tag-top">
+    <span><span class="icon query"></span>包含“{{= it.query}}”的</span>
+</h1>
+{{?}}
+{{? it.query && !it.posts.length }}
+<h3>什么都没有，换个关键词试试吧</h3>
+{{?}}
 {{~it.posts :p}}
     <div class="post-item">
         <div class="title">

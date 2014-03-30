@@ -9,6 +9,7 @@ define([
     'app/partials/post',
     'app/partials/about',
     'app/partials/gotop',
+    'app/partials/mathjax',
     /* model */
     'app/model',
     /* otherr */
@@ -25,6 +26,7 @@ define([
     post,
     about,
     gotop,
+    mathjax,
     model,
     uid,
     $
@@ -57,7 +59,7 @@ define([
 
         setViewportSize: function() {
 
-            viewDom.css( 'minHeight', window.innerHeight - foot.getDom()[0].offsetHeight );
+            viewDom.css( 'minHeight', window.innerHeight - nav.getDom()[0].offsetHeight );
         }
     };
 
@@ -71,7 +73,7 @@ define([
         _firstScreenReady && loader.show( document.body );
     };
 
-    var _hideLoading = function() {
+    var _hideLoading = function( cb ) {
 
         _timer && clearTimeout( _timer );
 
@@ -79,7 +81,9 @@ define([
             _loading = false;
             viewRootDom.removeClass( 'fog' );
             loader.hide();
-        }, 500 );
+
+            setTimeout( cb, 200 );
+        }, 200 );
     };
     /**
      * view function's decorators
@@ -99,12 +103,12 @@ define([
             post.init( viewDom );
             about.init( viewDom );
 
-            // if spinner keep animating, the mask can't do transtion
             $( '#spinner' ).removeClass( 'ani' );
 
             _listeners.setViewportSize();
 
             setTimeout( function() {
+
                 $( '.views' ).addClass( 'rise' );
             }, 50 );
 
@@ -116,16 +120,21 @@ define([
         viewFunc.apply( null );
     };
 
-    var _collapseNav = function( viewFunc ) {
+    var _updateNavAndMathjax = function( viewFunc ) {
 
         window.scrollTo( 0, 0 );
 
-        viewFunc.apply();
-        _loading && _hideLoading();
-        setTimeout( function() {
+        !_firstScreenReady && $( '.views' ).one( $.support.transition, function () {
+            mathjax.digest();
+        });
 
-            nav.isInited() && nav.hide();
-        }, _loading ? 500 : 0 );
+        nav.isInited() && nav.hide( null, true );
+        viewFunc.apply();
+
+        !_loading && mathjax.digest();
+        _loading && _hideLoading( function() {
+            mathjax.digest();
+        });
     };
 
     var _flushViews = function( dataOrPromise, viewFunc ) {
@@ -187,7 +196,7 @@ define([
 
             else {
 
-                throw e;
+                routeHandlers.error( e.message );
             }
         }
     };
@@ -212,7 +221,7 @@ define([
 
                 _flushViews( model.getListsByPage( index ), function( err, data ) {
 
-                    _collapseNav( function() {
+                    _updateNavAndMathjax( function() {
 
                         _initFirstScreen( function() {
 
@@ -236,7 +245,7 @@ define([
 
                 _flushViews( model.getPost( slug ), function( err, data ) {
 
-                    _collapseNav( function() {
+                    _updateNavAndMathjax( function() {
 
                         _initFirstScreen( function() {
 
@@ -260,7 +269,7 @@ define([
 
                 _flushViews( model.getTags(), function( err, data ) {
 
-                    _collapseNav( function() {
+                    _updateNavAndMathjax( function() {
 
                         _initFirstScreen( function() {
 
@@ -284,7 +293,7 @@ define([
 
                 _flushViews( model.getListsByTag( slug ), function( err, data ) {
 
-                    _collapseNav( function() {
+                    _updateNavAndMathjax( function() {
 
                         _initFirstScreen( function() {
 
@@ -307,7 +316,7 @@ define([
 
             _flushViews( null, function( err, data ) {
 
-                _collapseNav( function() {
+                _updateNavAndMathjax( function() {
 
                     _initFirstScreen( function() {
 
@@ -317,9 +326,28 @@ define([
             });
         },
 
-        search: function( key ) {
+        search: function( q ) {
 
-            console.log( '?q=' + key );
+            console.log( '?q=' + q );
+
+            _ifError( function() {
+
+                _flushViews( model.getListsByQuery( q ), function( err, data ) {
+
+                    _updateNavAndMathjax( function() {
+
+                        _initFirstScreen( function() {
+
+                            if ( !err ) page.render( data );
+
+                            else {
+
+                                routeHandlers.error( err );
+                            }
+                        });
+                    });
+                });
+            });
         },
 
         notfound: function() {
@@ -332,7 +360,7 @@ define([
 
             _flushViews( null, function() {
 
-                _collapseNav( function() {
+                _updateNavAndMathjax( function() {
 
                     _initFirstScreen( function() {
 

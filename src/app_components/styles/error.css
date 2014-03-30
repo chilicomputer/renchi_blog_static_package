@@ -8,9 +8,6 @@ section.error h1 {
 
 section.error {
 
-    background: url('http://renchi.qiniudn.com/bird-md.png') no-repeat;
-    background-size: 150px;
-    background-position: 90% 90%;
     padding: 30px 15px 110px 20px;
     font-size: 16px;
 }

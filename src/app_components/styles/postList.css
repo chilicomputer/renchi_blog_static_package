@@ -90,3 +90,7 @@
 .posts .icon.tag:before {
     content: '\e603';
 }
+
+.posts .icon.query:before {
+    content: '\e60f';
+}

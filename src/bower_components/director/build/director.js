@@ -357,7 +357,7 @@ function paramifyString(str, params, mod) {
     }
   }
   // chillicomputer modify here
-  return mod === str ? "([._a-zA-Z0-9-\\s]+)" : mod;
+  return mod === str ? "([._a-zA-Z0-9%\-]+)" : mod;
 }
 
 function regifyString(str, params) {
@@ -526,7 +526,7 @@ Router.prototype.invoke = function(fns, thisArg, callback) {
 
 Router.prototype.traverse = function(method, path, routes, regexp, filter) {
   var fns = [], current, exact, match, next, that;
-  path = decodeURIComponent( path );
+
   function filterRoutes(routes) {
     if (!filter) {
       return routes;

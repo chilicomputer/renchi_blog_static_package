@@ -15,6 +15,7 @@ define([
     var aniBusy;
     var inited;
     var $view;
+    var $input;
 
     var main = function() {
 
@@ -31,6 +32,7 @@ define([
 
         $view = $( tplStr )
         $view.prependTo( container );
+        $input = $( '[name=q]', $view );
 
         _listen();
 
@@ -44,32 +46,40 @@ define([
 
     var _handlers = {
 
-        show: function( cb ) {
+        show: function( cb, notani ) {
 
             if( $view.data( 'folded' ) ) return;
-            _listeners.toggle( null, cb );
+            _listeners.toggle( null, cb, notani );
         },
 
-        hide: function( cb ) {
+        hide: function( cb, notani ) {
 
             if( !$view.data( 'folded' ) ) return;
-            _listeners.toggle( null, cb );
+            _listeners.toggle( null, cb, notani );
         }
     };
 
     var _listen = function() {
 
         $( 'button', $view ).click( _listeners.toggle );
+        $( 'form', $view ).submit( _listeners.search );
     };
 
     var _listeners = {
 
-        toggle: function( e, cb ) {
-
-            if ( aniBusy ) return;
+        toggle: function( e, cb, notani ) {
 
             var isFold     = $view.data( 'folded' );
             var $menu      = $( '.navbar-collapse', $view );
+
+            if ( notani ) {
+
+                $view.data( 'folded', !isFold );
+                $menu.height( !isFold ? $menu[0].scrollHeight : 0  );
+                return;
+            }
+
+            if ( aniBusy ) return;
 
             aniBusy = true;
 
@@ -83,6 +93,21 @@ define([
                     typeof cb == 'function' && cb.call( $view );
                 }
             );
+        },
+
+        search: function( e ) {
+
+            var q = $input.val().trim();
+
+            if ( !q ) {
+
+                $input.addClass( 'error' );
+                return false;
+            }
+
+            $input.removeClass( 'error' );
+            location.hash = '#/search/' + encodeURIComponent( q );
+            return false;
         }
     };
 

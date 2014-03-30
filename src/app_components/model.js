@@ -15,9 +15,10 @@ define([
     var tagPageCache = {};
     var tagsCache     = null;
 
-    var RES_PAGES    = '/pages/';
-    var RES_TAGS     = '/tags/';
-    var RES_POST     = '/post/';
+    var RES_PAGES = '/pages/';
+    var RES_TAGS  = '/tags/';
+    var RES_POST  = '/post/';
+    var RES_QUERY = '/search/';
 
 
     var total     = APP_CONFIG.total;
@@ -72,12 +73,13 @@ define([
 
     var main = function() {
 
-        exports.getListsByPage = getListsByPage;
-        exports.getListsByTag  = getListsByTag;
-        exports.getTags        = getTags;
-        exports.getPost        = getPost;
-        exports.watch          = watch;
-        exports.errorCode      = ERROR_CODE;
+        exports.getListsByPage  = getListsByPage;
+        exports.getListsByQuery = getListsByQuery;
+        exports.getListsByTag   = getListsByTag;
+        exports.getTags         = getTags;
+        exports.getPost         = getPost;
+        exports.watch           = watch;
+        exports.errorCode       = ERROR_CODE;
     };
 
     var getListsByPage = function( page ) {
@@ -147,7 +149,7 @@ define([
 
             return {
 
-                tag:   slug,
+                tag:   decodeURIComponent( slug ),
                 posts: tagPageCache[ slug ],
                 prev:  null,
                 next:  null
@@ -160,6 +162,28 @@ define([
 
             tagPageCache[ slug ] = data;
             return getListsByTag( slug );
+        });
+
+        anotherPromise._request = promise._request;
+
+        return anotherPromise;
+    };
+
+    var getListsByQuery = function( q ) {
+
+        if ( !q ) throw new Error( ERROR_CODE.NOT_FOUND );
+
+        var promise = _fetchData( { path: RES_QUERY + q } );
+
+        var anotherPromise = promise.then( function( data ) {
+
+            return {
+
+                query: decodeURIComponent( q ),
+                posts: data,
+                prev: null,
+                next: null
+            };
         });
 
         anotherPromise._request = promise._request;

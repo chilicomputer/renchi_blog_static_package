@@ -1,11 +1,13 @@
 define([
 	'text!app/tpls/post.html',
 	'theme/post',
+	'app/partials/mathjax',
 	'doT',
 	'jquery'
 ], function(
 	tplStr,
 	dumbStyle,
+	mathjax,
 	doT,
 	$
 ){
@@ -31,11 +33,7 @@ define([
 		$view.html( tpl( data ) );
 
 		// MathJax
-
-		curl( ['js!mathjax'] ).then( function() {
-
-			MathJax.Hub.Queue([ 'Typeset', MathJax.Hub, $( 'section.post')[0] ]);
-		});
+		mathjax.queue( $( 'section.post' )[0] );
 	};
 
 	main();
