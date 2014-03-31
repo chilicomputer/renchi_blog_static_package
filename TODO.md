@@ -6,3 +6,4 @@
 * how to make decorators
 * when/sequence
 * wrap MathJax
+* customize bower_compoents
