@@ -17,7 +17,7 @@ define(function(){
 
 	var digest = function() {
 
-		if ( !_queueDoms.length ) return;
+		// if ( !_queueDoms.length ) return;
 
 		curl( ['js!mathjax'] ).then( function() {
 

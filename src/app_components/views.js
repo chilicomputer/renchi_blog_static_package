@@ -108,11 +108,11 @@ define([
             setTimeout( function() {
 
                 $( '.views' ).addClass( 'rise' );
-            }, 50 );
+            }, 300 );
 
             setTimeout( function() {
                 $( '.pic' ).addClass( 'fall' );
-            }, 250 );
+            }, 500 );
         }
 
         viewFunc.apply( null );
