@@ -108,6 +108,10 @@
     padding: 10px 15px;
 }
 
+ .icon.home:before {
+    content: '\e606';
+ }
+
  .icon.tags:before {
     content: '\e605';
  }
@@ -189,12 +193,16 @@
      .navbar-nav {
 
         margin: 0;
-        float: right!important;
     }
 
-     .navbar-nav>li {
+    .navbar-nav>li {
 
         float: left;
+    }
+
+    .navbar-nav>li:first-child {
+
+        float: right;
     }
 
      .navbar-nav>li>a {
@@ -207,7 +215,7 @@
 
         padding-top: 2px;
         padding-bottom: 2px;
-        width:310px;
+        height: 28px;
     }
 
      .menu-toggle:hover {
