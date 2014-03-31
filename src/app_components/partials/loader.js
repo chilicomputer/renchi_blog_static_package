@@ -20,6 +20,7 @@ define([
 
 	var show = function( container ) {
 
+		$( container ).html( '' );
 		$( container ).append( $view );
 	};
 

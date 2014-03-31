@@ -100,11 +100,11 @@ span.icon {
   height: 100%;
   overflow: hidden;
 
-  -webkit-transition: -webkit-transform .5s linear;
-  -ms-transition: -ms-transform .5s linear;
-  -o-transition: -o-transform .5s linear;
-  -moz-transition: -moz-transform .5s linear;
-  transition: transform .5s linear;
+  -webkit-transition: -webkit-transform .6s linear;
+  -ms-transition: -ms-transform .6s linear;
+  -o-transition: -o-transform .6s linear;
+  -moz-transition: -moz-transform .6s linear;
+  transition: transform .6s linear;
   -webkit-transform-style: preserve-3d;
   -ms-transform-style: preserve-3d;
   -o-transform-style: preserve-3d;
@@ -270,11 +270,11 @@ span.icon {
   width:100%;
   padding-top: 60px;
   min-height: 61px;
-  transition: top .5s .1s linear;
-  -webkit-transition: top .5s .1s linear;
-  -moz-transition: top .5s .1s linear;
-  -ms-transition: top .5s .1s linear;
-  -o-transition: top .5s .1s linear;
+  transition: top .5s linear;
+  -webkit-transition: top .6s linear;
+  -moz-transition: top .6s linear;
+  -ms-transition: top .6s linear;
+  -o-transition: top .6s linear;
 }
 
 .views.rise {

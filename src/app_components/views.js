@@ -9,6 +9,7 @@ define([
     'app/partials/about',
     'app/partials/gotop',
     'app/partials/mathjax',
+    'app/partials/loader',
     /* model */
     'app/model',
     /* otherr */
@@ -25,6 +26,7 @@ define([
     about,
     gotop,
     mathjax,
+    loader,
     model,
     uid,
     $
@@ -64,25 +66,25 @@ define([
     /**
      * helpers
      */
-    // var _showLoading = function() {
+    var _showLoading = function() {
 
-    //     _loading = true;
-    //     _firstScreenReady && viewRootDom.addClass( 'fog' );
-    //     _firstScreenReady && loader.show( document.body );
-    // };
+        if ( _firstScreenReady ) {
 
-    // var _hideLoading = function( cb ) {
+            _loading = true;
+            _firstScreenReady && loader.show( viewDom );
+        }
+    };
 
-    //     _timer && clearTimeout( _timer );
+    var _hideLoading = function( cb ) {
 
-    //     _timer = setTimeout( function() {
-    //         _loading = false;
-    //         viewRootDom.removeClass( 'fog' );
-    //         loader.hide();
+        _timer && clearTimeout( _timer );
 
-    //         setTimeout( cb, 200 );
-    //     }, 200 );
-    // };
+        _timer = setTimeout( function() {
+            _loading = false;
+            loader.hide();
+            cb && cb.call();
+        }, _loading ? 1000 : 0 );
+    };
     /**
      * view function's decorators
      */
@@ -105,29 +107,38 @@ define([
 
             _listeners.setViewportSize();
 
+            $( '.pic' ).one( $.support.transition, function () {
+                $( '.pic' ).hide();
+            });
             setTimeout( function() {
-
                 $( '.views' ).addClass( 'rise' );
-            }, 300 );
-
+            }, 600 );
             setTimeout( function() {
                 $( '.pic' ).addClass( 'fall' );
-            }, 500 );
+            }, 800 );
         }
 
         viewFunc.apply( null );
     };
 
-    var _updateNavAndMathjax = function( viewFunc ) {
+    var _updateMathjaxAndLoader = function( viewFunc ) {
 
-        window.scrollTo( 0, 0 );
+        _hideLoading( function() {
 
-        !_firstScreenReady && $( '.views' ).one( $.support.transition, function () {
-            mathjax.digest();
+            if ( !_firstScreenReady ) {
+
+                viewFunc.apply();
+                $( '.views' ).one( $.support.transition, function () {
+                    mathjax.digest();
+                });
+            }
+
+            else {
+
+                viewFunc.apply();
+                mathjax.digest();
+            }
         });
-
-        nav.isInited() && nav.hide( null, true );
-        viewFunc.apply();
     };
 
     var _flushViews = function( dataOrPromise, viewFunc ) {
@@ -141,6 +152,9 @@ define([
                 delete _viewQueues[ _qid ];
             }
         }
+
+        window.scrollTo( 0, 0 );
+        nav.isInited() && nav.hide( null, true );
 
         if ( dataOrPromise && dataOrPromise.then ) {
             // it's a promise
@@ -164,6 +178,7 @@ define([
             // queue the promise
             dataOrPromise._qid = uid();
             _viewQueues[ dataOrPromise._qid ] = dataOrPromise;
+            _showLoading();
         }
 
         else {
@@ -213,7 +228,7 @@ define([
 
                 _flushViews( model.getListsByPage( index ), function( err, data ) {
 
-                    _updateNavAndMathjax( function() {
+                    _updateMathjaxAndLoader( function() {
 
                         _initFirstScreen( function() {
 
@@ -237,7 +252,7 @@ define([
 
                 _flushViews( model.getPost( slug ), function( err, data ) {
 
-                    _updateNavAndMathjax( function() {
+                    _updateMathjaxAndLoader( function() {
 
                         _initFirstScreen( function() {
 
@@ -261,7 +276,7 @@ define([
 
                 _flushViews( model.getTags(), function( err, data ) {
 
-                    _updateNavAndMathjax( function() {
+                    _updateMathjaxAndLoader( function() {
 
                         _initFirstScreen( function() {
 
@@ -285,7 +300,7 @@ define([
 
                 _flushViews( model.getListsByTag( slug ), function( err, data ) {
 
-                    _updateNavAndMathjax( function() {
+                    _updateMathjaxAndLoader( function() {
 
                         _initFirstScreen( function() {
 
@@ -308,7 +323,7 @@ define([
 
             _flushViews( null, function( err, data ) {
 
-                _updateNavAndMathjax( function() {
+                _updateMathjaxAndLoader( function() {
 
                     _initFirstScreen( function() {
 
@@ -326,7 +341,7 @@ define([
 
                 _flushViews( model.getListsByQuery( q ), function( err, data ) {
 
-                    _updateNavAndMathjax( function() {
+                    _updateMathjaxAndLoader( function() {
 
                         _initFirstScreen( function() {
 
@@ -352,7 +367,7 @@ define([
 
             _flushViews( null, function() {
 
-                _updateNavAndMathjax( function() {
+                _updateMathjaxAndLoader( function() {
 
                     _initFirstScreen( function() {
 
