@@ -46,10 +46,7 @@
 			{
 				name: 'jquery',
 				location: 'bower_components/jquery/dist',
-				main: 'jquery',
-				config: {
-					moduleLoader: 'curl/loader/cjsm11'
-				}
+				main: 'jquery'
 			},
 
 			{
@@ -296,7 +293,7 @@ define('curl/plugin/js', ['curl/_privileged'], function (priv) {
 	function () { try { return eval(arguments[0]); } catch (ex) { return; } }
 ));
 
-;define('director/director', ['require', 'exports', 'module'], function (require, exports, module) {
+;define('director/director', ['require', 'exports', 'module'], function (require, exports, module, define) {
 
 //
 // Generated on Fri Dec 27 2013 12:02:11 GMT-0500 (EST) by Nodejitsu, Inc (Using Codesurgeon).
@@ -1032,7 +1029,1027 @@ Router.prototype.mount = function(routes, path) {
 });
 
 
-;define('jquery/jquery', ['require', 'exports', 'module'], function (require, exports, module) {/*!
+;define('app/partials/mathjax', function () {
+'use strict';
+
+	var exports = {};
+	var _queueDoms = [];
+
+	var main = function() {
+
+		exports.queue = queue;
+		exports.digest = digest;
+	};
+
+	var queue = function( dom ) {
+
+		_queueDoms.push( dom );
+	};
+
+	var digest = function() {
+
+		// if ( !_queueDoms.length ) return;
+
+		curl( ['js!mathjax'] ).then( function() {
+
+			var dom;
+
+			while( _queueDoms.length ) {
+
+				dom = _queueDoms.shift();
+
+				window.MathJax.Hub.Queue([ 'Typeset', MathJax.Hub, dom ]);
+			}
+		});
+	};
+
+	main();
+	return exports;
+});
+
+;
+define('app/utils/uid', function () {
+'use strict';
+
+    /**
+     * title
+     * @created date
+     * @author chillicomputer@gmail.com
+     */
+
+    return function() {
+
+        return Math.random().toString( 18 ).substr( 2, 32 );
+    };
+});
+// doT.js
+// 2011, Laura Doktorova, https://github.com/olado/doT
+// Licensed under the MIT license.
+
+(function() {
+	"use strict";
+
+	var doT = {
+		version: '1.0.1',
+		templateSettings: {
+			evaluate:    /\{\{([\s\S]+?(\}?)+)\}\}/g,
+			interpolate: /\{\{=([\s\S]+?)\}\}/g,
+			encode:      /\{\{!([\s\S]+?)\}\}/g,
+			use:         /\{\{#([\s\S]+?)\}\}/g,
+			useParams:   /(^|[^\w$])def(?:\.|\[[\'\"])([\w$\.]+)(?:[\'\"]\])?\s*\:\s*([\w$\.]+|\"[^\"]+\"|\'[^\']+\'|\{[^\}]+\})/g,
+			define:      /\{\{##\s*([\w\.$]+)\s*(\:|=)([\s\S]+?)#\}\}/g,
+			defineParams:/^\s*([\w$]+):([\s\S]+)/,
+			conditional: /\{\{\?(\?)?\s*([\s\S]*?)\s*\}\}/g,
+			iterate:     /\{\{~\s*(?:\}\}|([\s\S]+?)\s*\:\s*([\w$]+)\s*(?:\:\s*([\w$]+))?\s*\}\})/g,
+			varname:	'it',
+			strip:		true,
+			append:		true,
+			selfcontained: false
+		},
+		template: undefined, //fn, compile template
+		compile:  undefined  //fn, for express
+	}, global;
+
+	if (typeof module !== 'undefined' && module.exports) {
+		module.exports = doT;
+	} else if (typeof define === 'function' && define.amd) {
+		define('doT/doT', function () {return doT;});
+	} else {
+		global = (function(){ return this || (0,eval)('this'); }());
+		global.doT = doT;
+	}
+
+	function encodeHTMLSource() {
+		var encodeHTMLRules = { "&": "&#38;", "<": "&#60;", ">": "&#62;", '"': '&#34;', "'": '&#39;', "/": '&#47;' },
+			matchHTML = /&(?!#?\w+;)|<|>|"|'|\//g;
+		return function() {
+			return this ? this.replace(matchHTML, function(m) {return encodeHTMLRules[m] || m;}) : this;
+		};
+	}
+	String.prototype.encodeHTML = encodeHTMLSource();
+
+	var startend = {
+		append: { start: "'+(",      end: ")+'",      endencode: "||'').toString().encodeHTML()+'" },
+		split:  { start: "';out+=(", end: ");out+='", endencode: "||'').toString().encodeHTML();out+='"}
+	}, skip = /$^/;
+
+	function resolveDefs(c, block, def) {
+		return ((typeof block === 'string') ? block : block.toString())
+		.replace(c.define || skip, function(m, code, assign, value) {
+			if (code.indexOf('def.') === 0) {
+				code = code.substring(4);
+			}
+			if (!(code in def)) {
+				if (assign === ':') {
+					if (c.defineParams) value.replace(c.defineParams, function(m, param, v) {
+						def[code] = {arg: param, text: v};
+					});
+					if (!(code in def)) def[code]= value;
+				} else {
+					new Function("def", "def['"+code+"']=" + value)(def);
+				}
+			}
+			return '';
+		})
+		.replace(c.use || skip, function(m, code) {
+			if (c.useParams) code = code.replace(c.useParams, function(m, s, d, param) {
+				if (def[d] && def[d].arg && param) {
+					var rw = (d+":"+param).replace(/'|\\/g, '_');
+					def.__exp = def.__exp || {};
+					def.__exp[rw] = def[d].text.replace(new RegExp("(^|[^\\w$])" + def[d].arg + "([^\\w$])", "g"), "$1" + param + "$2");
+					return s + "def.__exp['"+rw+"']";
+				}
+			});
+			var v = new Function("def", "return " + code)(def);
+			return v ? resolveDefs(c, v, def) : v;
+		});
+	}
+
+	function unescape(code) {
+		return code.replace(/\\('|\\)/g, "$1").replace(/[\r\t\n]/g, ' ');
+	}
+
+	doT.template = function(tmpl, c, def) {
+		c = c || doT.templateSettings;
+		var cse = c.append ? startend.append : startend.split, needhtmlencode, sid = 0, indv,
+			str  = (c.use || c.define) ? resolveDefs(c, tmpl, def || {}) : tmpl;
+
+		str = ("var out='" + (c.strip ? str.replace(/(^|\r|\n)\t* +| +\t*(\r|\n|$)/g,' ')
+					.replace(/\r|\n|\t|\/\*[\s\S]*?\*\//g,''): str)
+			.replace(/'|\\/g, '\\$&')
+			.replace(c.interpolate || skip, function(m, code) {
+				return cse.start + unescape(code) + cse.end;
+			})
+			.replace(c.encode || skip, function(m, code) {
+				needhtmlencode = true;
+				return cse.start + unescape(code) + cse.endencode;
+			})
+			.replace(c.conditional || skip, function(m, elsecase, code) {
+				return elsecase ?
+					(code ? "';}else if(" + unescape(code) + "){out+='" : "';}else{out+='") :
+					(code ? "';if(" + unescape(code) + "){out+='" : "';}out+='");
+			})
+			.replace(c.iterate || skip, function(m, iterate, vname, iname) {
+				if (!iterate) return "';} } out+='";
+				sid+=1; indv=iname || "i"+sid; iterate=unescape(iterate);
+				return "';var arr"+sid+"="+iterate+";if(arr"+sid+"){var "+vname+","+indv+"=-1,l"+sid+"=arr"+sid+".length-1;while("+indv+"<l"+sid+"){"
+					+vname+"=arr"+sid+"["+indv+"+=1];out+='";
+			})
+			.replace(c.evaluate || skip, function(m, code) {
+				return "';" + unescape(code) + "out+='";
+			})
+			+ "';return out;")
+			.replace(/\n/g, '\\n').replace(/\t/g, '\\t').replace(/\r/g, '\\r')
+			.replace(/(\s|;|\}|^|\{)out\+='';/g, '$1').replace(/\+''/g, '')
+			.replace(/(\s|;|\}|^|\{)out\+=''\+/g,'$1out+=');
+
+		if (needhtmlencode && c.selfcontained) {
+			str = "String.prototype.encodeHTML=(" + encodeHTMLSource.toString() + "());" + str;
+		}
+		try {
+			return new Function(c.varname, str);
+		} catch (e) {
+			if (typeof console !== 'undefined') console.log("Could not create a template function: " + str);
+			throw e;
+		}
+	};
+
+	doT.compile = function(tmpl, def) {
+		return doT.template(tmpl, null, def);
+	};
+}());
+
+;define('curl/plugin/text!app/tpls/postList.html', function () {
+return "{{ function filter(d) { }}\r\n{{ return new Date(d).toLocaleDateString(); }}\r\n{{ } }}\r\n\r\n<section class=\"posts\">\r\n{{? it.tag}}\r\n<h1 class=\"tag-top\">\r\n    <span><span class=\"icon tag\"></span>{{= it.tag}}</span>\r\n</h1>\r\n{{?}}\r\n{{? it.query}}\r\n<h1 class=\"tag-top\">\r\n    <span><span class=\"icon query\"></span>包含“{{= it.query}}”的</span>\r\n</h1>\r\n{{?}}\r\n{{? it.query && !it.posts.length }}\r\n<h3>什么都没有，换个关键词试试吧</h3>\r\n{{?}}\r\n{{~it.posts :p}}\r\n    <div class=\"post-item\">\r\n        <div class=\"title\">\r\n            <h1>{{= p.title}}</h1>\r\n            <p>{{= filter(p.date)}}</p>\r\n        </div>\r\n        <div class=\"preview\">\r\n            {{= p.preview}}\r\n        </div>\r\n    </div>\r\n{{~}}\r\n{{? it.prev != null || it.next != null }}\r\n<div class=\"pagers\">\r\n    {{? it.prev != null}}\r\n    <a href=\"#/page/{{= it.prev}}\" title=\"前一页\"><span class=\"icon new\"></span></a>\r\n    {{?}}\r\n    {{? it.next != null}}\r\n    <a href=\"#/page/{{= it.next}}\" title=\"后一页\"><span class=\"icon old\"></span></a>\r\n    {{?}}\r\n</div>\r\n{{?}}\r\n</section>"
+});
+
+;define('curl/plugin/text!app/tpls/foot.html', function () {
+return "<footer class=\"top\">\r\n    <div class=\"container\">\r\n        <img src=\"http://s.gravatar.com/avatar/d42b5358bd29aeecf4a3b59102f8be56?s=80\"></img>\r\n        <h1>&trade;Renchi</h1>\r\n        <h2>&copy;1987-2014</h2>\r\n    </div>\r\n</footer>"
+});
+
+;define('curl/plugin/text!app/tpls/tags.html', function () {
+return "{{ function escape(s) { }}\r\n{{ return encodeURIComponent(s); }}\r\n{{ } }}\r\n\r\n<section class=\"tag-list\">\r\n\r\n\t<ul>\r\n\t\t{{~it: t}}\r\n\t\t<li>\r\n\t\t\t<div>\r\n\t\t\t<a class=\"item\" href=\"#/tags/{{= escape(t.name)}}\">\r\n\t\t\t\t<span class=\"icon tag\"></span>\r\n\t\t\t\t<span class=\"name\">{{= t.name}}</span>\r\n\t\t\t</a>\r\n\t\t\t<span class=\"count\">{{= t.count}}</span>\r\n\t\t\t</div>\r\n\t\t</li>\r\n\t\t{{~}}\r\n\t</ul>\r\n</section>"
+});
+/**
+ * @author sole / http://soledadpenades.com
+ * @author mrdoob / http://mrdoob.com
+ * @author Robert Eisele / http://www.xarg.org
+ * @author Philippe / http://philippe.elsass.me
+ * @author Robert Penner / http://www.robertpenner.com/easing_terms_of_use.html
+ * @author Paul Lewis / http://www.aerotwist.com/
+ * @author lechecacharro
+ * @author Josh Faul / http://jocafa.com/
+ * @author egraether / http://egraether.com/
+ * @author endel / http://endel.me
+ * @author Ben Delarre / http://delarre.net
+ */
+
+// Date.now shim for (ahem) Internet Explo(d|r)er
+
+define('tween/Tween.js', function () {
+
+	if ( Date.now === undefined ) {
+
+		Date.now = function () {
+
+			return new Date().valueOf();
+
+		};
+
+	}
+
+	var TWEEN = TWEEN || ( function () {
+
+		var _tweens = [];
+
+		return {
+
+			REVISION: '12',
+
+			getAll: function () {
+
+				return _tweens;
+
+			},
+
+			removeAll: function () {
+
+				_tweens = [];
+
+			},
+
+			add: function ( tween ) {
+
+				_tweens.push( tween );
+
+			},
+
+			remove: function ( tween ) {
+
+				var i = _tweens.indexOf( tween );
+
+				if ( i !== -1 ) {
+
+					_tweens.splice( i, 1 );
+
+				}
+
+			},
+
+			update: function ( time ) {
+
+				if ( _tweens.length === 0 ) return false;
+
+				var i = 0;
+
+				time = time !== undefined ? time : ( typeof window !== 'undefined' && window.performance !== undefined && window.performance.now !== undefined ? window.performance.now() : Date.now() );
+
+				while ( i < _tweens.length ) {
+
+					if ( _tweens[ i ].update( time ) ) {
+
+						i++;
+
+					} else {
+
+						_tweens.splice( i, 1 );
+
+					}
+
+				}
+
+				return true;
+
+			}
+		};
+
+	} )();
+
+	TWEEN.Tween = function ( object ) {
+
+		var _object = object;
+		var _valuesStart = {};
+		var _valuesEnd = {};
+		var _valuesStartRepeat = {};
+		var _duration = 1000;
+		var _repeat = 0;
+		var _yoyo = false;
+		var _isPlaying = false;
+		var _reversed = false;
+		var _delayTime = 0;
+		var _startTime = null;
+		var _easingFunction = TWEEN.Easing.Linear.None;
+		var _interpolationFunction = TWEEN.Interpolation.Linear;
+		var _chainedTweens = [];
+		var _onStartCallback = null;
+		var _onStartCallbackFired = false;
+		var _onUpdateCallback = null;
+		var _onCompleteCallback = null;
+
+		// Set all starting values present on the target object
+		for ( var field in object ) {
+
+			_valuesStart[ field ] = parseFloat(object[field], 10);
+
+		}
+
+		this.to = function ( properties, duration ) {
+
+			if ( duration !== undefined ) {
+
+				_duration = duration;
+
+			}
+
+			_valuesEnd = properties;
+
+			return this;
+
+		};
+
+		this.start = function ( time ) {
+
+			TWEEN.add( this );
+
+			_isPlaying = true;
+
+			_onStartCallbackFired = false;
+
+			_startTime = time !== undefined ? time : ( typeof window !== 'undefined' && window.performance !== undefined && window.performance.now !== undefined ? window.performance.now() : Date.now() );
+			_startTime += _delayTime;
+
+			for ( var property in _valuesEnd ) {
+
+				// check if an Array was provided as property value
+				if ( _valuesEnd[ property ] instanceof Array ) {
+
+					if ( _valuesEnd[ property ].length === 0 ) {
+
+						continue;
+
+					}
+
+					// create a local copy of the Array with the start value at the front
+					_valuesEnd[ property ] = [ _object[ property ] ].concat( _valuesEnd[ property ] );
+
+				}
+
+				_valuesStart[ property ] = _object[ property ];
+
+				if( ( _valuesStart[ property ] instanceof Array ) === false ) {
+					_valuesStart[ property ] *= 1.0; // Ensures we're using numbers, not strings
+				}
+
+				_valuesStartRepeat[ property ] = _valuesStart[ property ] || 0;
+
+			}
+
+			return this;
+
+		};
+
+		this.stop = function () {
+
+			if ( !_isPlaying ) {
+				return this;
+			}
+
+			TWEEN.remove( this );
+			_isPlaying = false;
+			this.stopChainedTweens();
+			return this;
+
+		};
+
+		this.stopChainedTweens = function () {
+
+			for ( var i = 0, numChainedTweens = _chainedTweens.length; i < numChainedTweens; i++ ) {
+
+				_chainedTweens[ i ].stop();
+
+			}
+
+		};
+
+		this.delay = function ( amount ) {
+
+			_delayTime = amount;
+			return this;
+
+		};
+
+		this.repeat = function ( times ) {
+
+			_repeat = times;
+			return this;
+
+		};
+
+		this.yoyo = function( yoyo ) {
+
+			_yoyo = yoyo;
+			return this;
+
+		};
+
+
+		this.easing = function ( easing ) {
+
+			_easingFunction = easing;
+			return this;
+
+		};
+
+		this.interpolation = function ( interpolation ) {
+
+			_interpolationFunction = interpolation;
+			return this;
+
+		};
+
+		this.chain = function () {
+
+			_chainedTweens = arguments;
+			return this;
+
+		};
+
+		this.onStart = function ( callback ) {
+
+			_onStartCallback = callback;
+			return this;
+
+		};
+
+		this.onUpdate = function ( callback ) {
+
+			_onUpdateCallback = callback;
+			return this;
+
+		};
+
+		this.onComplete = function ( callback ) {
+
+			_onCompleteCallback = callback;
+			return this;
+
+		};
+
+		this.update = function ( time ) {
+
+			var property;
+
+			if ( time < _startTime ) {
+
+				return true;
+
+			}
+
+			if ( _onStartCallbackFired === false ) {
+
+				if ( _onStartCallback !== null ) {
+
+					_onStartCallback.call( _object );
+
+				}
+
+				_onStartCallbackFired = true;
+
+			}
+
+			var elapsed = ( time - _startTime ) / _duration;
+			elapsed = elapsed > 1 ? 1 : elapsed;
+
+			var value = _easingFunction( elapsed );
+
+			for ( property in _valuesEnd ) {
+
+				var start = _valuesStart[ property ] || 0;
+				var end = _valuesEnd[ property ];
+
+				if ( end instanceof Array ) {
+
+					_object[ property ] = _interpolationFunction( end, value );
+
+				} else {
+
+	                // Parses relative end values with start as base (e.g.: +10, -3)
+					if ( typeof(end) === "string" ) {
+						end = start + parseFloat(end, 10);
+					}
+
+					// protect against non numeric properties.
+	                if ( typeof(end) === "number" ) {
+						_object[ property ] = start + ( end - start ) * value;
+					}
+
+				}
+
+			}
+
+			if ( _onUpdateCallback !== null ) {
+
+				_onUpdateCallback.call( _object, value );
+
+			}
+
+			if ( elapsed == 1 ) {
+
+				if ( _repeat > 0 ) {
+
+					if( isFinite( _repeat ) ) {
+						_repeat--;
+					}
+
+					// reassign starting values, restart by making startTime = now
+					for( property in _valuesStartRepeat ) {
+
+						if ( typeof( _valuesEnd[ property ] ) === "string" ) {
+							_valuesStartRepeat[ property ] = _valuesStartRepeat[ property ] + parseFloat(_valuesEnd[ property ], 10);
+						}
+
+						if (_yoyo) {
+							var tmp = _valuesStartRepeat[ property ];
+							_valuesStartRepeat[ property ] = _valuesEnd[ property ];
+							_valuesEnd[ property ] = tmp;
+							_reversed = !_reversed;
+						}
+						_valuesStart[ property ] = _valuesStartRepeat[ property ];
+
+					}
+
+					_startTime = time + _delayTime;
+
+					return true;
+
+				} else {
+
+					if ( _onCompleteCallback !== null ) {
+
+						_onCompleteCallback.call( _object );
+
+					}
+
+					for ( var i = 0, numChainedTweens = _chainedTweens.length; i < numChainedTweens; i++ ) {
+
+						_chainedTweens[ i ].start( time );
+
+					}
+
+					return false;
+
+				}
+
+			}
+
+			return true;
+
+		};
+
+	};
+
+
+	TWEEN.Easing = {
+
+		Linear: {
+
+			None: function ( k ) {
+
+				return k;
+
+			}
+
+		},
+
+		Quadratic: {
+
+			In: function ( k ) {
+
+				return k * k;
+
+			},
+
+			Out: function ( k ) {
+
+				return k * ( 2 - k );
+
+			},
+
+			InOut: function ( k ) {
+
+				if ( ( k *= 2 ) < 1 ) return 0.5 * k * k;
+				return - 0.5 * ( --k * ( k - 2 ) - 1 );
+
+			}
+
+		},
+
+		Cubic: {
+
+			In: function ( k ) {
+
+				return k * k * k;
+
+			},
+
+			Out: function ( k ) {
+
+				return --k * k * k + 1;
+
+			},
+
+			InOut: function ( k ) {
+
+				if ( ( k *= 2 ) < 1 ) return 0.5 * k * k * k;
+				return 0.5 * ( ( k -= 2 ) * k * k + 2 );
+
+			}
+
+		},
+
+		Quartic: {
+
+			In: function ( k ) {
+
+				return k * k * k * k;
+
+			},
+
+			Out: function ( k ) {
+
+				return 1 - ( --k * k * k * k );
+
+			},
+
+			InOut: function ( k ) {
+
+				if ( ( k *= 2 ) < 1) return 0.5 * k * k * k * k;
+				return - 0.5 * ( ( k -= 2 ) * k * k * k - 2 );
+
+			}
+
+		},
+
+		Quintic: {
+
+			In: function ( k ) {
+
+				return k * k * k * k * k;
+
+			},
+
+			Out: function ( k ) {
+
+				return --k * k * k * k * k + 1;
+
+			},
+
+			InOut: function ( k ) {
+
+				if ( ( k *= 2 ) < 1 ) return 0.5 * k * k * k * k * k;
+				return 0.5 * ( ( k -= 2 ) * k * k * k * k + 2 );
+
+			}
+
+		},
+
+		Sinusoidal: {
+
+			In: function ( k ) {
+
+				return 1 - Math.cos( k * Math.PI / 2 );
+
+			},
+
+			Out: function ( k ) {
+
+				return Math.sin( k * Math.PI / 2 );
+
+			},
+
+			InOut: function ( k ) {
+
+				return 0.5 * ( 1 - Math.cos( Math.PI * k ) );
+
+			}
+
+		},
+
+		Exponential: {
+
+			In: function ( k ) {
+
+				return k === 0 ? 0 : Math.pow( 1024, k - 1 );
+
+			},
+
+			Out: function ( k ) {
+
+				return k === 1 ? 1 : 1 - Math.pow( 2, - 10 * k );
+
+			},
+
+			InOut: function ( k ) {
+
+				if ( k === 0 ) return 0;
+				if ( k === 1 ) return 1;
+				if ( ( k *= 2 ) < 1 ) return 0.5 * Math.pow( 1024, k - 1 );
+				return 0.5 * ( - Math.pow( 2, - 10 * ( k - 1 ) ) + 2 );
+
+			}
+
+		},
+
+		Circular: {
+
+			In: function ( k ) {
+
+				return 1 - Math.sqrt( 1 - k * k );
+
+			},
+
+			Out: function ( k ) {
+
+				return Math.sqrt( 1 - ( --k * k ) );
+
+			},
+
+			InOut: function ( k ) {
+
+				if ( ( k *= 2 ) < 1) return - 0.5 * ( Math.sqrt( 1 - k * k) - 1);
+				return 0.5 * ( Math.sqrt( 1 - ( k -= 2) * k) + 1);
+
+			}
+
+		},
+
+		Elastic: {
+
+			In: function ( k ) {
+
+				var s, a = 0.1, p = 0.4;
+				if ( k === 0 ) return 0;
+				if ( k === 1 ) return 1;
+				if ( !a || a < 1 ) { a = 1; s = p / 4; }
+				else s = p * Math.asin( 1 / a ) / ( 2 * Math.PI );
+				return - ( a * Math.pow( 2, 10 * ( k -= 1 ) ) * Math.sin( ( k - s ) * ( 2 * Math.PI ) / p ) );
+
+			},
+
+			Out: function ( k ) {
+
+				var s, a = 0.1, p = 0.4;
+				if ( k === 0 ) return 0;
+				if ( k === 1 ) return 1;
+				if ( !a || a < 1 ) { a = 1; s = p / 4; }
+				else s = p * Math.asin( 1 / a ) / ( 2 * Math.PI );
+				return ( a * Math.pow( 2, - 10 * k) * Math.sin( ( k - s ) * ( 2 * Math.PI ) / p ) + 1 );
+
+			},
+
+			InOut: function ( k ) {
+
+				var s, a = 0.1, p = 0.4;
+				if ( k === 0 ) return 0;
+				if ( k === 1 ) return 1;
+				if ( !a || a < 1 ) { a = 1; s = p / 4; }
+				else s = p * Math.asin( 1 / a ) / ( 2 * Math.PI );
+				if ( ( k *= 2 ) < 1 ) return - 0.5 * ( a * Math.pow( 2, 10 * ( k -= 1 ) ) * Math.sin( ( k - s ) * ( 2 * Math.PI ) / p ) );
+				return a * Math.pow( 2, -10 * ( k -= 1 ) ) * Math.sin( ( k - s ) * ( 2 * Math.PI ) / p ) * 0.5 + 1;
+
+			}
+
+		},
+
+		Back: {
+
+			In: function ( k ) {
+
+				var s = 1.70158;
+				return k * k * ( ( s + 1 ) * k - s );
+
+			},
+
+			Out: function ( k ) {
+
+				var s = 1.70158;
+				return --k * k * ( ( s + 1 ) * k + s ) + 1;
+
+			},
+
+			InOut: function ( k ) {
+
+				var s = 1.70158 * 1.525;
+				if ( ( k *= 2 ) < 1 ) return 0.5 * ( k * k * ( ( s + 1 ) * k - s ) );
+				return 0.5 * ( ( k -= 2 ) * k * ( ( s + 1 ) * k + s ) + 2 );
+
+			}
+
+		},
+
+		Bounce: {
+
+			In: function ( k ) {
+
+				return 1 - TWEEN.Easing.Bounce.Out( 1 - k );
+
+			},
+
+			Out: function ( k ) {
+
+				if ( k < ( 1 / 2.75 ) ) {
+
+					return 7.5625 * k * k;
+
+				} else if ( k < ( 2 / 2.75 ) ) {
+
+					return 7.5625 * ( k -= ( 1.5 / 2.75 ) ) * k + 0.75;
+
+				} else if ( k < ( 2.5 / 2.75 ) ) {
+
+					return 7.5625 * ( k -= ( 2.25 / 2.75 ) ) * k + 0.9375;
+
+				} else {
+
+					return 7.5625 * ( k -= ( 2.625 / 2.75 ) ) * k + 0.984375;
+
+				}
+
+			},
+
+			InOut: function ( k ) {
+
+				if ( k < 0.5 ) return TWEEN.Easing.Bounce.In( k * 2 ) * 0.5;
+				return TWEEN.Easing.Bounce.Out( k * 2 - 1 ) * 0.5 + 0.5;
+
+			}
+
+		}
+
+	};
+
+	TWEEN.Interpolation = {
+
+		Linear: function ( v, k ) {
+
+			var m = v.length - 1, f = m * k, i = Math.floor( f ), fn = TWEEN.Interpolation.Utils.Linear;
+
+			if ( k < 0 ) return fn( v[ 0 ], v[ 1 ], f );
+			if ( k > 1 ) return fn( v[ m ], v[ m - 1 ], m - f );
+
+			return fn( v[ i ], v[ i + 1 > m ? m : i + 1 ], f - i );
+
+		},
+
+		Bezier: function ( v, k ) {
+
+			var b = 0, n = v.length - 1, pw = Math.pow, bn = TWEEN.Interpolation.Utils.Bernstein, i;
+
+			for ( i = 0; i <= n; i++ ) {
+				b += pw( 1 - k, n - i ) * pw( k, i ) * v[ i ] * bn( n, i );
+			}
+
+			return b;
+
+		},
+
+		CatmullRom: function ( v, k ) {
+
+			var m = v.length - 1, f = m * k, i = Math.floor( f ), fn = TWEEN.Interpolation.Utils.CatmullRom;
+
+			if ( v[ 0 ] === v[ m ] ) {
+
+				if ( k < 0 ) i = Math.floor( f = m * ( 1 + k ) );
+
+				return fn( v[ ( i - 1 + m ) % m ], v[ i ], v[ ( i + 1 ) % m ], v[ ( i + 2 ) % m ], f - i );
+
+			} else {
+
+				if ( k < 0 ) return v[ 0 ] - ( fn( v[ 0 ], v[ 0 ], v[ 1 ], v[ 1 ], -f ) - v[ 0 ] );
+				if ( k > 1 ) return v[ m ] - ( fn( v[ m ], v[ m ], v[ m - 1 ], v[ m - 1 ], f - m ) - v[ m ] );
+
+				return fn( v[ i ? i - 1 : 0 ], v[ i ], v[ m < i + 1 ? m : i + 1 ], v[ m < i + 2 ? m : i + 2 ], f - i );
+
+			}
+
+		},
+
+		Utils: {
+
+			Linear: function ( p0, p1, t ) {
+
+				return ( p1 - p0 ) * t + p0;
+
+			},
+
+			Bernstein: function ( n , i ) {
+
+				var fc = TWEEN.Interpolation.Utils.Factorial;
+				return fc( n ) / fc( i ) / fc( n - i );
+
+			},
+
+			Factorial: ( function () {
+
+				var a = [ 1 ];
+
+				return function ( n ) {
+
+					var s = 1, i;
+					if ( a[ n ] ) return a[ n ];
+					for ( i = n; i > 1; i-- ) s *= i;
+					return a[ n ] = s;
+
+				};
+
+			} )(),
+
+			CatmullRom: function ( p0, p1, p2, p3, t ) {
+
+				var v0 = ( p2 - p0 ) * 0.5, v1 = ( p3 - p1 ) * 0.5, t2 = t * t, t3 = t * t2;
+				return ( 2 * p1 - 2 * p2 + v0 + v1 ) * t3 + ( - 3 * p1 + 3 * p2 - 2 * v0 - v1 ) * t2 + v0 * t + p1;
+
+			}
+
+		}
+
+	};
+
+	return TWEEN;
+});
+
+
+;define('app/utils/animationFrame', function () {
+
+    var vendor = [ 'ms', 'moz', 'webkit', 'o', '' ];
+
+    var requestAnimationFrame,
+        cancelAnimationFrame;
+
+    for ( var len = vendor.length; len--; ) {
+
+        var _v = vendor [len];
+
+        var attrRequest = _v ? _v + 'RequestAnimationFrame' : _v + 'requestAnimationFrame',
+            attrCancel  = _v ? _v + 'CancelAnimationFrame' : _v + 'cancelAnimationFrame';
+
+        if ( window[attrRequest] ) {
+
+            requestAnimationFrame = window[attrRequest];
+            cancelAnimationFrame = window[attrCancel];
+            break;
+        }
+    }
+
+    var lastTime = 0;
+
+    if ( !requestAnimationFrame ) {
+
+        requestAnimationFrame = function( render ) {
+
+            var currentTime = new Date().getTime();
+
+            var timeToWait = Math.max( 0, 16 - ( currentTime - lastTime ) );
+
+            var timer = setTimeout( function() {
+
+                render.call( null, currentTime + timeToWait );
+
+            }, timeToWait);
+
+            lastTime = currentTime + timeToWait;
+
+            return timer;
+        };
+    }
+
+    if ( !cancelAnimationFrame ) {
+
+        cancelAnimationFrame = function( timer ) {
+
+            clearTimeout( timer );
+        };
+    }
+
+    return {
+
+        request: requestAnimationFrame,
+        cancel:  cancelAnimationFrame
+    };
+});
+
+;define('curl/plugin/text!app/tpls/about.html', function () {
+return "<section class=\"about\">\r\n\r\n<h1 class=\"title\"><span class=\"icon beer\"></span>Nice to meet you!</h1>\r\n<div class=\"bg\">\r\n\t<div class=\"content\">\r\n\t\t<h2 class=\"name\"><span>这是chillicomputer的blog</span></h2>\r\n\t\t<div class=\"intro\">\r\n\t\t\t<p><span>这个blog用于记录我在工作生活中是如何工作生活的，也可能有成人或非人的内容乱入。</span></p>\r\n\t\t</div>\r\n\t\t<div class=\"resume\">\r\n\t\t\t<p class=\"text\"><span>我喜欢图形学、猫奴、痴迷重金属、经常画画、热爱生活、向往自由、最欣赏的电影是Dark Knight和Fight Club、看过2遍以上的漫画是《幽油白书》和《無限の住人》。。。</span></p>\r\n\t\t\t<p class=\"text\"><span>Good Luck!</span></p>\r\n\t\t</div>\r\n\t\t<div class=\"social\">\r\n\t\t\t<ul>\r\n\t\t\t\t<li><a target=\"_blank\" href=\"https://github.com/chilicomputer\"><span class=\"icon git\"></span></a></li>\r\n\t\t\t\t<li><a target=\"_blank\" href=\"http://weibo.com/1856956684/\"><span class=\"icon weibo\"></span></a></li>\r\n\t\t\t\t<li><a target=\"_blank\" href=\"https://www.facebook.com/chillicomputer\"><span class=\"icon fb\"></span></a></li>\r\n\t\t\t\t<li><a target=\"_blank\" href=\"http://www.linkedin.com/profile/view?id=286118182\"><span class=\"icon linkedin\"></span></a></li>\r\n\t\t\t\t<li><a target=\"_blank\" href=\"mailto:chillicomputer@gmail.com?Subject=Hello%20again\"><span class=\"icon mail\"></span></a></li>\r\n\t\t\t</ul>\r\n\t\t</div>\r\n\t</div>\r\n</div>\r\n</section>"
+});
+
+;define('curl/plugin/text!app/tpls/post.html', function () {
+return "{{ function filter(d) { }}\r\n{{ return new Date(d).toLocaleDateString(); }}\r\n{{ } }}\r\n{{ function escape(s) { }}\r\n{{ return encodeURIComponent(s); }}\r\n{{ } }}\r\n<section class=\"post\">\r\n\r\n\t<div class=\"title\">\r\n        <h1>{{= it.title}}</h1>\r\n        <p>{{= filter(it.date)}}</p>\r\n    </div>\r\n\r\n    <div class=\"content\">\r\n    \t{{= it.content}}\r\n    </div>\r\n\r\n\t<div class=\"foot\">\r\n\t    <ul>\r\n\t    \t{{~it.tags: t}}\r\n\t\t\t<li>\r\n\t\t\t<a href=\"#/tags/{{=escape(t)}}\">\r\n\t\t\t\t<span class=\"icon tag\"></span>\r\n\t\t\t\t<span class=\"name\">{{= t}}</span>\r\n\t\t\t</a>\r\n\t\t\t</li>\r\n\t    \t{{~}}\r\n\t    </ul>\r\n\t</div>\r\n</section>"
+});
+
+;define('curl/plugin/text!app/tpls/nav.html', function () {
+return "<header class=\"top-banner navbar\">\r\n    <div class=\"container\">\r\n        <div class=\"nav-header\">\r\n            <button class=\"menu-toggle\">\r\n                <span class=\"icon-toggle\"></span>\r\n                <span class=\"icon-toggle\"></span>\r\n                <span class=\"icon-toggle\"></span>\r\n            </button>\r\n            <a href=\"#/\" class=\"navbar-brand\">Bpmf</a>\r\n        </div>\r\n        <nav class=\"navbar-collapse collapse\">\r\n            <ul class=\"navbar-nav\">\r\n                <li>\r\n\r\n                  <form action=\"#/search\">\r\n                    <input type=\"text\" name=\"q\" placeholder=\"search...\">\r\n                  </form>\r\n\r\n                </li>\r\n                <li>\r\n                  <a href=\"#/tags\"><span class=\"icon tags\"></span>标签</a>\r\n                </li>\r\n                <li>\r\n                  <a href=\"#/about\"><span class=\"icon about\"></span>关于</a>\r\n                </li>\r\n                <li>\r\n                  <a href=\"/demo/\"><span class=\"icon demos\"></span>试验</a>\r\n                </li>\r\n            </ul>\r\n        </nav>\r\n    </div>\r\n</header>"
+});
+/*!
  * jQuery JavaScript Library v2.1.0
  * http://jquery.com/
  *
@@ -10103,7 +11120,7 @@ jQuery.fn.andSelf = jQuery.fn.addBack;
 // file name. Do this after creating the global so that if an AMD module wants
 // to call noConflict to hide this version of jQuery, it will work.
 if ( typeof define === "function" && define.amd ) {
-	define('jquery', function () {
+	define('jquery/jquery', function () {
 		return jQuery;
 	});
 }
@@ -10143,1030 +11160,6 @@ if ( typeof noGlobal === strundefined ) {
 return jQuery;
 
 }));
-
-});
-
-
-;
-define('app/utils/uid', function () {
-'use strict';
-
-    /**
-     * title
-     * @created date
-     * @author chillicomputer@gmail.com
-     */
-
-    return function() {
-
-        return Math.random().toString( 18 ).substr( 2, 32 );
-    };
-});
-
-;define('curl/plugin/text!app/tpls/tags.html', function () {
-return "{{ function escape(s) { }}\r\n{{ return encodeURIComponent(s); }}\r\n{{ } }}\r\n\r\n<section class=\"tag-list\">\r\n\r\n\t<ul>\r\n\t\t{{~it: t}}\r\n\t\t<li>\r\n\t\t\t<div>\r\n\t\t\t<a class=\"item\" href=\"#/tags/{{= escape(t.name)}}\">\r\n\t\t\t\t<span class=\"icon tag\"></span>\r\n\t\t\t\t<span class=\"name\">{{= t.name}}</span>\r\n\t\t\t</a>\r\n\t\t\t<span class=\"count\">{{= t.count}}</span>\r\n\t\t\t</div>\r\n\t\t</li>\r\n\t\t{{~}}\r\n\t</ul>\r\n</section>"
-});
-
-;define('curl/plugin/text!app/tpls/post.html', function () {
-return "{{ function filter(d) { }}\r\n{{ return new Date(d).toLocaleDateString(); }}\r\n{{ } }}\r\n{{ function escape(s) { }}\r\n{{ return encodeURIComponent(s); }}\r\n{{ } }}\r\n<section class=\"post\">\r\n\r\n\t<div class=\"title\">\r\n        <h1>{{= it.title}}</h1>\r\n        <p>{{= filter(it.date)}}</p>\r\n    </div>\r\n\r\n    <div class=\"content\">\r\n    \t{{= it.content}}\r\n    </div>\r\n\r\n\t<div class=\"foot\">\r\n\t    <ul>\r\n\t    \t{{~it.tags: t}}\r\n\t\t\t<li>\r\n\t\t\t<a href=\"#/tags/{{=escape(t)}}\">\r\n\t\t\t\t<span class=\"icon tag\"></span>\r\n\t\t\t\t<span class=\"name\">{{= t}}</span>\r\n\t\t\t</a>\r\n\t\t\t</li>\r\n\t    \t{{~}}\r\n\t    </ul>\r\n\t</div>\r\n</section>"
-});
-
-;define('curl/plugin/text!app/tpls/nav.html', function () {
-return "<header class=\"top-banner navbar\">\r\n    <div class=\"container\">\r\n        <div class=\"nav-header\">\r\n            <button class=\"menu-toggle\">\r\n                <span class=\"icon-toggle\"></span>\r\n                <span class=\"icon-toggle\"></span>\r\n                <span class=\"icon-toggle\"></span>\r\n            </button>\r\n            <a href=\"#/\" class=\"navbar-brand\">Bpmf</a>\r\n        </div>\r\n        <nav class=\"navbar-collapse collapse\">\r\n            <ul class=\"navbar-nav\">\r\n                <li>\r\n\r\n                  <form action=\"#/search\">\r\n                    <input type=\"text\" name=\"q\" placeholder=\"search...\">\r\n                  </form>\r\n\r\n                </li>\r\n                <li>\r\n                  <a href=\"#/tags\"><span class=\"icon tags\"></span>标签</a>\r\n                </li>\r\n                <li>\r\n                  <a href=\"#/about\"><span class=\"icon about\"></span>关于</a>\r\n                </li>\r\n                <li>\r\n                  <a href=\"/demo/\"><span class=\"icon demos\"></span>试验</a>\r\n                </li>\r\n            </ul>\r\n        </nav>\r\n    </div>\r\n</header>"
-});
-
-;define('app/utils/animationFrame', function () {
-
-    var vendor = [ 'ms', 'moz', 'webkit', 'o', '' ];
-
-    var requestAnimationFrame,
-        cancelAnimationFrame;
-
-    for ( var len = vendor.length; len--; ) {
-
-        var _v = vendor [len];
-
-        var attrRequest = _v ? _v + 'RequestAnimationFrame' : _v + 'requestAnimationFrame',
-            attrCancel  = _v ? _v + 'CancelAnimationFrame' : _v + 'cancelAnimationFrame';
-
-        if ( window[attrRequest] ) {
-
-            requestAnimationFrame = window[attrRequest];
-            cancelAnimationFrame = window[attrCancel];
-            break;
-        }
-    }
-
-    var lastTime = 0;
-
-    if ( !requestAnimationFrame ) {
-
-        requestAnimationFrame = function( render ) {
-
-            var currentTime = new Date().getTime();
-
-            var timeToWait = Math.max( 0, 16 - ( currentTime - lastTime ) );
-
-            var timer = setTimeout( function() {
-
-                render.call( null, currentTime + timeToWait );
-
-            }, timeToWait);
-
-            lastTime = currentTime + timeToWait;
-
-            return timer;
-        };
-    }
-
-    if ( !cancelAnimationFrame ) {
-
-        cancelAnimationFrame = function( timer ) {
-
-            clearTimeout( timer );
-        };
-    }
-
-    return {
-
-        request: requestAnimationFrame,
-        cancel:  cancelAnimationFrame
-    };
-});
-/**
- * @author sole / http://soledadpenades.com
- * @author mrdoob / http://mrdoob.com
- * @author Robert Eisele / http://www.xarg.org
- * @author Philippe / http://philippe.elsass.me
- * @author Robert Penner / http://www.robertpenner.com/easing_terms_of_use.html
- * @author Paul Lewis / http://www.aerotwist.com/
- * @author lechecacharro
- * @author Josh Faul / http://jocafa.com/
- * @author egraether / http://egraether.com/
- * @author endel / http://endel.me
- * @author Ben Delarre / http://delarre.net
- */
-
-// Date.now shim for (ahem) Internet Explo(d|r)er
-
-define('tween/Tween.js', function () {
-
-	if ( Date.now === undefined ) {
-
-		Date.now = function () {
-
-			return new Date().valueOf();
-
-		};
-
-	}
-
-	var TWEEN = TWEEN || ( function () {
-
-		var _tweens = [];
-
-		return {
-
-			REVISION: '12',
-
-			getAll: function () {
-
-				return _tweens;
-
-			},
-
-			removeAll: function () {
-
-				_tweens = [];
-
-			},
-
-			add: function ( tween ) {
-
-				_tweens.push( tween );
-
-			},
-
-			remove: function ( tween ) {
-
-				var i = _tweens.indexOf( tween );
-
-				if ( i !== -1 ) {
-
-					_tweens.splice( i, 1 );
-
-				}
-
-			},
-
-			update: function ( time ) {
-
-				if ( _tweens.length === 0 ) return false;
-
-				var i = 0;
-
-				time = time !== undefined ? time : ( typeof window !== 'undefined' && window.performance !== undefined && window.performance.now !== undefined ? window.performance.now() : Date.now() );
-
-				while ( i < _tweens.length ) {
-
-					if ( _tweens[ i ].update( time ) ) {
-
-						i++;
-
-					} else {
-
-						_tweens.splice( i, 1 );
-
-					}
-
-				}
-
-				return true;
-
-			}
-		};
-
-	} )();
-
-	TWEEN.Tween = function ( object ) {
-
-		var _object = object;
-		var _valuesStart = {};
-		var _valuesEnd = {};
-		var _valuesStartRepeat = {};
-		var _duration = 1000;
-		var _repeat = 0;
-		var _yoyo = false;
-		var _isPlaying = false;
-		var _reversed = false;
-		var _delayTime = 0;
-		var _startTime = null;
-		var _easingFunction = TWEEN.Easing.Linear.None;
-		var _interpolationFunction = TWEEN.Interpolation.Linear;
-		var _chainedTweens = [];
-		var _onStartCallback = null;
-		var _onStartCallbackFired = false;
-		var _onUpdateCallback = null;
-		var _onCompleteCallback = null;
-
-		// Set all starting values present on the target object
-		for ( var field in object ) {
-
-			_valuesStart[ field ] = parseFloat(object[field], 10);
-
-		}
-
-		this.to = function ( properties, duration ) {
-
-			if ( duration !== undefined ) {
-
-				_duration = duration;
-
-			}
-
-			_valuesEnd = properties;
-
-			return this;
-
-		};
-
-		this.start = function ( time ) {
-
-			TWEEN.add( this );
-
-			_isPlaying = true;
-
-			_onStartCallbackFired = false;
-
-			_startTime = time !== undefined ? time : ( typeof window !== 'undefined' && window.performance !== undefined && window.performance.now !== undefined ? window.performance.now() : Date.now() );
-			_startTime += _delayTime;
-
-			for ( var property in _valuesEnd ) {
-
-				// check if an Array was provided as property value
-				if ( _valuesEnd[ property ] instanceof Array ) {
-
-					if ( _valuesEnd[ property ].length === 0 ) {
-
-						continue;
-
-					}
-
-					// create a local copy of the Array with the start value at the front
-					_valuesEnd[ property ] = [ _object[ property ] ].concat( _valuesEnd[ property ] );
-
-				}
-
-				_valuesStart[ property ] = _object[ property ];
-
-				if( ( _valuesStart[ property ] instanceof Array ) === false ) {
-					_valuesStart[ property ] *= 1.0; // Ensures we're using numbers, not strings
-				}
-
-				_valuesStartRepeat[ property ] = _valuesStart[ property ] || 0;
-
-			}
-
-			return this;
-
-		};
-
-		this.stop = function () {
-
-			if ( !_isPlaying ) {
-				return this;
-			}
-
-			TWEEN.remove( this );
-			_isPlaying = false;
-			this.stopChainedTweens();
-			return this;
-
-		};
-
-		this.stopChainedTweens = function () {
-
-			for ( var i = 0, numChainedTweens = _chainedTweens.length; i < numChainedTweens; i++ ) {
-
-				_chainedTweens[ i ].stop();
-
-			}
-
-		};
-
-		this.delay = function ( amount ) {
-
-			_delayTime = amount;
-			return this;
-
-		};
-
-		this.repeat = function ( times ) {
-
-			_repeat = times;
-			return this;
-
-		};
-
-		this.yoyo = function( yoyo ) {
-
-			_yoyo = yoyo;
-			return this;
-
-		};
-
-
-		this.easing = function ( easing ) {
-
-			_easingFunction = easing;
-			return this;
-
-		};
-
-		this.interpolation = function ( interpolation ) {
-
-			_interpolationFunction = interpolation;
-			return this;
-
-		};
-
-		this.chain = function () {
-
-			_chainedTweens = arguments;
-			return this;
-
-		};
-
-		this.onStart = function ( callback ) {
-
-			_onStartCallback = callback;
-			return this;
-
-		};
-
-		this.onUpdate = function ( callback ) {
-
-			_onUpdateCallback = callback;
-			return this;
-
-		};
-
-		this.onComplete = function ( callback ) {
-
-			_onCompleteCallback = callback;
-			return this;
-
-		};
-
-		this.update = function ( time ) {
-
-			var property;
-
-			if ( time < _startTime ) {
-
-				return true;
-
-			}
-
-			if ( _onStartCallbackFired === false ) {
-
-				if ( _onStartCallback !== null ) {
-
-					_onStartCallback.call( _object );
-
-				}
-
-				_onStartCallbackFired = true;
-
-			}
-
-			var elapsed = ( time - _startTime ) / _duration;
-			elapsed = elapsed > 1 ? 1 : elapsed;
-
-			var value = _easingFunction( elapsed );
-
-			for ( property in _valuesEnd ) {
-
-				var start = _valuesStart[ property ] || 0;
-				var end = _valuesEnd[ property ];
-
-				if ( end instanceof Array ) {
-
-					_object[ property ] = _interpolationFunction( end, value );
-
-				} else {
-
-	                // Parses relative end values with start as base (e.g.: +10, -3)
-					if ( typeof(end) === "string" ) {
-						end = start + parseFloat(end, 10);
-					}
-
-					// protect against non numeric properties.
-	                if ( typeof(end) === "number" ) {
-						_object[ property ] = start + ( end - start ) * value;
-					}
-
-				}
-
-			}
-
-			if ( _onUpdateCallback !== null ) {
-
-				_onUpdateCallback.call( _object, value );
-
-			}
-
-			if ( elapsed == 1 ) {
-
-				if ( _repeat > 0 ) {
-
-					if( isFinite( _repeat ) ) {
-						_repeat--;
-					}
-
-					// reassign starting values, restart by making startTime = now
-					for( property in _valuesStartRepeat ) {
-
-						if ( typeof( _valuesEnd[ property ] ) === "string" ) {
-							_valuesStartRepeat[ property ] = _valuesStartRepeat[ property ] + parseFloat(_valuesEnd[ property ], 10);
-						}
-
-						if (_yoyo) {
-							var tmp = _valuesStartRepeat[ property ];
-							_valuesStartRepeat[ property ] = _valuesEnd[ property ];
-							_valuesEnd[ property ] = tmp;
-							_reversed = !_reversed;
-						}
-						_valuesStart[ property ] = _valuesStartRepeat[ property ];
-
-					}
-
-					_startTime = time + _delayTime;
-
-					return true;
-
-				} else {
-
-					if ( _onCompleteCallback !== null ) {
-
-						_onCompleteCallback.call( _object );
-
-					}
-
-					for ( var i = 0, numChainedTweens = _chainedTweens.length; i < numChainedTweens; i++ ) {
-
-						_chainedTweens[ i ].start( time );
-
-					}
-
-					return false;
-
-				}
-
-			}
-
-			return true;
-
-		};
-
-	};
-
-
-	TWEEN.Easing = {
-
-		Linear: {
-
-			None: function ( k ) {
-
-				return k;
-
-			}
-
-		},
-
-		Quadratic: {
-
-			In: function ( k ) {
-
-				return k * k;
-
-			},
-
-			Out: function ( k ) {
-
-				return k * ( 2 - k );
-
-			},
-
-			InOut: function ( k ) {
-
-				if ( ( k *= 2 ) < 1 ) return 0.5 * k * k;
-				return - 0.5 * ( --k * ( k - 2 ) - 1 );
-
-			}
-
-		},
-
-		Cubic: {
-
-			In: function ( k ) {
-
-				return k * k * k;
-
-			},
-
-			Out: function ( k ) {
-
-				return --k * k * k + 1;
-
-			},
-
-			InOut: function ( k ) {
-
-				if ( ( k *= 2 ) < 1 ) return 0.5 * k * k * k;
-				return 0.5 * ( ( k -= 2 ) * k * k + 2 );
-
-			}
-
-		},
-
-		Quartic: {
-
-			In: function ( k ) {
-
-				return k * k * k * k;
-
-			},
-
-			Out: function ( k ) {
-
-				return 1 - ( --k * k * k * k );
-
-			},
-
-			InOut: function ( k ) {
-
-				if ( ( k *= 2 ) < 1) return 0.5 * k * k * k * k;
-				return - 0.5 * ( ( k -= 2 ) * k * k * k - 2 );
-
-			}
-
-		},
-
-		Quintic: {
-
-			In: function ( k ) {
-
-				return k * k * k * k * k;
-
-			},
-
-			Out: function ( k ) {
-
-				return --k * k * k * k * k + 1;
-
-			},
-
-			InOut: function ( k ) {
-
-				if ( ( k *= 2 ) < 1 ) return 0.5 * k * k * k * k * k;
-				return 0.5 * ( ( k -= 2 ) * k * k * k * k + 2 );
-
-			}
-
-		},
-
-		Sinusoidal: {
-
-			In: function ( k ) {
-
-				return 1 - Math.cos( k * Math.PI / 2 );
-
-			},
-
-			Out: function ( k ) {
-
-				return Math.sin( k * Math.PI / 2 );
-
-			},
-
-			InOut: function ( k ) {
-
-				return 0.5 * ( 1 - Math.cos( Math.PI * k ) );
-
-			}
-
-		},
-
-		Exponential: {
-
-			In: function ( k ) {
-
-				return k === 0 ? 0 : Math.pow( 1024, k - 1 );
-
-			},
-
-			Out: function ( k ) {
-
-				return k === 1 ? 1 : 1 - Math.pow( 2, - 10 * k );
-
-			},
-
-			InOut: function ( k ) {
-
-				if ( k === 0 ) return 0;
-				if ( k === 1 ) return 1;
-				if ( ( k *= 2 ) < 1 ) return 0.5 * Math.pow( 1024, k - 1 );
-				return 0.5 * ( - Math.pow( 2, - 10 * ( k - 1 ) ) + 2 );
-
-			}
-
-		},
-
-		Circular: {
-
-			In: function ( k ) {
-
-				return 1 - Math.sqrt( 1 - k * k );
-
-			},
-
-			Out: function ( k ) {
-
-				return Math.sqrt( 1 - ( --k * k ) );
-
-			},
-
-			InOut: function ( k ) {
-
-				if ( ( k *= 2 ) < 1) return - 0.5 * ( Math.sqrt( 1 - k * k) - 1);
-				return 0.5 * ( Math.sqrt( 1 - ( k -= 2) * k) + 1);
-
-			}
-
-		},
-
-		Elastic: {
-
-			In: function ( k ) {
-
-				var s, a = 0.1, p = 0.4;
-				if ( k === 0 ) return 0;
-				if ( k === 1 ) return 1;
-				if ( !a || a < 1 ) { a = 1; s = p / 4; }
-				else s = p * Math.asin( 1 / a ) / ( 2 * Math.PI );
-				return - ( a * Math.pow( 2, 10 * ( k -= 1 ) ) * Math.sin( ( k - s ) * ( 2 * Math.PI ) / p ) );
-
-			},
-
-			Out: function ( k ) {
-
-				var s, a = 0.1, p = 0.4;
-				if ( k === 0 ) return 0;
-				if ( k === 1 ) return 1;
-				if ( !a || a < 1 ) { a = 1; s = p / 4; }
-				else s = p * Math.asin( 1 / a ) / ( 2 * Math.PI );
-				return ( a * Math.pow( 2, - 10 * k) * Math.sin( ( k - s ) * ( 2 * Math.PI ) / p ) + 1 );
-
-			},
-
-			InOut: function ( k ) {
-
-				var s, a = 0.1, p = 0.4;
-				if ( k === 0 ) return 0;
-				if ( k === 1 ) return 1;
-				if ( !a || a < 1 ) { a = 1; s = p / 4; }
-				else s = p * Math.asin( 1 / a ) / ( 2 * Math.PI );
-				if ( ( k *= 2 ) < 1 ) return - 0.5 * ( a * Math.pow( 2, 10 * ( k -= 1 ) ) * Math.sin( ( k - s ) * ( 2 * Math.PI ) / p ) );
-				return a * Math.pow( 2, -10 * ( k -= 1 ) ) * Math.sin( ( k - s ) * ( 2 * Math.PI ) / p ) * 0.5 + 1;
-
-			}
-
-		},
-
-		Back: {
-
-			In: function ( k ) {
-
-				var s = 1.70158;
-				return k * k * ( ( s + 1 ) * k - s );
-
-			},
-
-			Out: function ( k ) {
-
-				var s = 1.70158;
-				return --k * k * ( ( s + 1 ) * k + s ) + 1;
-
-			},
-
-			InOut: function ( k ) {
-
-				var s = 1.70158 * 1.525;
-				if ( ( k *= 2 ) < 1 ) return 0.5 * ( k * k * ( ( s + 1 ) * k - s ) );
-				return 0.5 * ( ( k -= 2 ) * k * ( ( s + 1 ) * k + s ) + 2 );
-
-			}
-
-		},
-
-		Bounce: {
-
-			In: function ( k ) {
-
-				return 1 - TWEEN.Easing.Bounce.Out( 1 - k );
-
-			},
-
-			Out: function ( k ) {
-
-				if ( k < ( 1 / 2.75 ) ) {
-
-					return 7.5625 * k * k;
-
-				} else if ( k < ( 2 / 2.75 ) ) {
-
-					return 7.5625 * ( k -= ( 1.5 / 2.75 ) ) * k + 0.75;
-
-				} else if ( k < ( 2.5 / 2.75 ) ) {
-
-					return 7.5625 * ( k -= ( 2.25 / 2.75 ) ) * k + 0.9375;
-
-				} else {
-
-					return 7.5625 * ( k -= ( 2.625 / 2.75 ) ) * k + 0.984375;
-
-				}
-
-			},
-
-			InOut: function ( k ) {
-
-				if ( k < 0.5 ) return TWEEN.Easing.Bounce.In( k * 2 ) * 0.5;
-				return TWEEN.Easing.Bounce.Out( k * 2 - 1 ) * 0.5 + 0.5;
-
-			}
-
-		}
-
-	};
-
-	TWEEN.Interpolation = {
-
-		Linear: function ( v, k ) {
-
-			var m = v.length - 1, f = m * k, i = Math.floor( f ), fn = TWEEN.Interpolation.Utils.Linear;
-
-			if ( k < 0 ) return fn( v[ 0 ], v[ 1 ], f );
-			if ( k > 1 ) return fn( v[ m ], v[ m - 1 ], m - f );
-
-			return fn( v[ i ], v[ i + 1 > m ? m : i + 1 ], f - i );
-
-		},
-
-		Bezier: function ( v, k ) {
-
-			var b = 0, n = v.length - 1, pw = Math.pow, bn = TWEEN.Interpolation.Utils.Bernstein, i;
-
-			for ( i = 0; i <= n; i++ ) {
-				b += pw( 1 - k, n - i ) * pw( k, i ) * v[ i ] * bn( n, i );
-			}
-
-			return b;
-
-		},
-
-		CatmullRom: function ( v, k ) {
-
-			var m = v.length - 1, f = m * k, i = Math.floor( f ), fn = TWEEN.Interpolation.Utils.CatmullRom;
-
-			if ( v[ 0 ] === v[ m ] ) {
-
-				if ( k < 0 ) i = Math.floor( f = m * ( 1 + k ) );
-
-				return fn( v[ ( i - 1 + m ) % m ], v[ i ], v[ ( i + 1 ) % m ], v[ ( i + 2 ) % m ], f - i );
-
-			} else {
-
-				if ( k < 0 ) return v[ 0 ] - ( fn( v[ 0 ], v[ 0 ], v[ 1 ], v[ 1 ], -f ) - v[ 0 ] );
-				if ( k > 1 ) return v[ m ] - ( fn( v[ m ], v[ m ], v[ m - 1 ], v[ m - 1 ], f - m ) - v[ m ] );
-
-				return fn( v[ i ? i - 1 : 0 ], v[ i ], v[ m < i + 1 ? m : i + 1 ], v[ m < i + 2 ? m : i + 2 ], f - i );
-
-			}
-
-		},
-
-		Utils: {
-
-			Linear: function ( p0, p1, t ) {
-
-				return ( p1 - p0 ) * t + p0;
-
-			},
-
-			Bernstein: function ( n , i ) {
-
-				var fc = TWEEN.Interpolation.Utils.Factorial;
-				return fc( n ) / fc( i ) / fc( n - i );
-
-			},
-
-			Factorial: ( function () {
-
-				var a = [ 1 ];
-
-				return function ( n ) {
-
-					var s = 1, i;
-					if ( a[ n ] ) return a[ n ];
-					for ( i = n; i > 1; i-- ) s *= i;
-					return a[ n ] = s;
-
-				};
-
-			} )(),
-
-			CatmullRom: function ( p0, p1, p2, p3, t ) {
-
-				var v0 = ( p2 - p0 ) * 0.5, v1 = ( p3 - p1 ) * 0.5, t2 = t * t, t3 = t * t2;
-				return ( 2 * p1 - 2 * p2 + v0 + v1 ) * t3 + ( - 3 * p1 + 3 * p2 - 2 * v0 - v1 ) * t2 + v0 * t + p1;
-
-			}
-
-		}
-
-	};
-
-	return TWEEN;
-});
-
-
-;define('curl/plugin/text!app/tpls/about.html', function () {
-return "<section class=\"about\">\r\n\r\n<h1 class=\"title\"><span class=\"icon beer\"></span>Nice to meet you!</h1>\r\n<div class=\"bg\">\r\n\t<div class=\"content\">\r\n\t\t<h2 class=\"name\"><span>这是chillicomputer的blog</span></h2>\r\n\t\t<div class=\"intro\">\r\n\t\t\t<p><span>这个blog用于记录我在工作生活中是如何工作生活的，也可能有成人或非人的内容乱入。</span></p>\r\n\t\t</div>\r\n\t\t<div class=\"resume\">\r\n\t\t\t<p class=\"text\"><span>我喜欢图形学、猫奴、痴迷重金属、经常画画、热爱生活、向往自由、最欣赏的电影是Dark Knight和Fight Club、看过2遍以上的漫画是《幽油白书》和《無限の住人》。。。</span></p>\r\n\t\t\t<p class=\"text\"><span>Good Luck!</span></p>\r\n\t\t</div>\r\n\t\t<div class=\"social\">\r\n\t\t\t<ul>\r\n\t\t\t\t<li><a target=\"_blank\" href=\"https://github.com/chilicomputer\"><span class=\"icon git\"></span></a></li>\r\n\t\t\t\t<li><a target=\"_blank\" href=\"http://weibo.com/1856956684/\"><span class=\"icon weibo\"></span></a></li>\r\n\t\t\t\t<li><a target=\"_blank\" href=\"https://www.facebook.com/chillicomputer\"><span class=\"icon fb\"></span></a></li>\r\n\t\t\t\t<li><a target=\"_blank\" href=\"http://www.linkedin.com/profile/view?id=286118182\"><span class=\"icon linkedin\"></span></a></li>\r\n\t\t\t\t<li><a target=\"_blank\" href=\"mailto:chillicomputer@gmail.com?Subject=Hello%20again\"><span class=\"icon mail\"></span></a></li>\r\n\t\t\t</ul>\r\n\t\t</div>\r\n\t</div>\r\n</div>\r\n</section>"
-});
-
-;define('app/partials/mathjax', function () {
-'use strict';
-
-	var exports = {};
-	var _queueDoms = [];
-
-	var main = function() {
-
-		exports.queue = queue;
-		exports.digest = digest;
-	};
-
-	var queue = function( dom ) {
-
-		_queueDoms.push( dom );
-	};
-
-	var digest = function() {
-
-		// if ( !_queueDoms.length ) return;
-
-		curl( ['js!mathjax'] ).then( function() {
-
-			var dom;
-
-			while( _queueDoms.length ) {
-
-				dom = _queueDoms.shift();
-
-				window.MathJax.Hub.Queue([ 'Typeset', MathJax.Hub, dom ]);
-			}
-		});
-	};
-
-	main();
-	return exports;
-});
-
-;define('curl/plugin/text!app/tpls/postList.html', function () {
-return "{{ function filter(d) { }}\r\n{{ return new Date(d).toLocaleDateString(); }}\r\n{{ } }}\r\n\r\n<section class=\"posts\">\r\n{{? it.tag}}\r\n<h1 class=\"tag-top\">\r\n    <span><span class=\"icon tag\"></span>{{= it.tag}}</span>\r\n</h1>\r\n{{?}}\r\n{{? it.query}}\r\n<h1 class=\"tag-top\">\r\n    <span><span class=\"icon query\"></span>包含“{{= it.query}}”的</span>\r\n</h1>\r\n{{?}}\r\n{{? it.query && !it.posts.length }}\r\n<h3>什么都没有，换个关键词试试吧</h3>\r\n{{?}}\r\n{{~it.posts :p}}\r\n    <div class=\"post-item\">\r\n        <div class=\"title\">\r\n            <h1>{{= p.title}}</h1>\r\n            <p>{{= filter(p.date)}}</p>\r\n        </div>\r\n        <div class=\"preview\">\r\n            {{= p.preview}}\r\n        </div>\r\n    </div>\r\n{{~}}\r\n{{? it.prev != null || it.next != null }}\r\n<div class=\"pagers\">\r\n    {{? it.prev != null}}\r\n    <a href=\"#/page/{{= it.prev}}\" title=\"前一页\"><span class=\"icon new\"></span></a>\r\n    {{?}}\r\n    {{? it.next != null}}\r\n    <a href=\"#/page/{{= it.next}}\" title=\"后一页\"><span class=\"icon old\"></span></a>\r\n    {{?}}\r\n</div>\r\n{{?}}\r\n</section>"
-});
-
-;define('curl/plugin/text!app/tpls/foot.html', function () {
-return "<footer class=\"top\">\r\n    <div class=\"container\">\r\n        <img src=\"http://s.gravatar.com/avatar/d42b5358bd29aeecf4a3b59102f8be56?s=80\"></img>\r\n        <h1>&trade;Renchi</h1>\r\n        <h2>&copy;1987-2014</h2>\r\n    </div>\r\n</footer>"
-});
-// doT.js
-// 2011, Laura Doktorova, https://github.com/olado/doT
-// Licensed under the MIT license.
-
-(function() {
-	"use strict";
-
-	var doT = {
-		version: '1.0.1',
-		templateSettings: {
-			evaluate:    /\{\{([\s\S]+?(\}?)+)\}\}/g,
-			interpolate: /\{\{=([\s\S]+?)\}\}/g,
-			encode:      /\{\{!([\s\S]+?)\}\}/g,
-			use:         /\{\{#([\s\S]+?)\}\}/g,
-			useParams:   /(^|[^\w$])def(?:\.|\[[\'\"])([\w$\.]+)(?:[\'\"]\])?\s*\:\s*([\w$\.]+|\"[^\"]+\"|\'[^\']+\'|\{[^\}]+\})/g,
-			define:      /\{\{##\s*([\w\.$]+)\s*(\:|=)([\s\S]+?)#\}\}/g,
-			defineParams:/^\s*([\w$]+):([\s\S]+)/,
-			conditional: /\{\{\?(\?)?\s*([\s\S]*?)\s*\}\}/g,
-			iterate:     /\{\{~\s*(?:\}\}|([\s\S]+?)\s*\:\s*([\w$]+)\s*(?:\:\s*([\w$]+))?\s*\}\})/g,
-			varname:	'it',
-			strip:		true,
-			append:		true,
-			selfcontained: false
-		},
-		template: undefined, //fn, compile template
-		compile:  undefined  //fn, for express
-	}, global;
-
-	if (typeof module !== 'undefined' && module.exports) {
-		module.exports = doT;
-	} else if (typeof define === 'function' && define.amd) {
-		define('doT/doT', function () {return doT;});
-	} else {
-		global = (function(){ return this || (0,eval)('this'); }());
-		global.doT = doT;
-	}
-
-	function encodeHTMLSource() {
-		var encodeHTMLRules = { "&": "&#38;", "<": "&#60;", ">": "&#62;", '"': '&#34;', "'": '&#39;', "/": '&#47;' },
-			matchHTML = /&(?!#?\w+;)|<|>|"|'|\//g;
-		return function() {
-			return this ? this.replace(matchHTML, function(m) {return encodeHTMLRules[m] || m;}) : this;
-		};
-	}
-	String.prototype.encodeHTML = encodeHTMLSource();
-
-	var startend = {
-		append: { start: "'+(",      end: ")+'",      endencode: "||'').toString().encodeHTML()+'" },
-		split:  { start: "';out+=(", end: ");out+='", endencode: "||'').toString().encodeHTML();out+='"}
-	}, skip = /$^/;
-
-	function resolveDefs(c, block, def) {
-		return ((typeof block === 'string') ? block : block.toString())
-		.replace(c.define || skip, function(m, code, assign, value) {
-			if (code.indexOf('def.') === 0) {
-				code = code.substring(4);
-			}
-			if (!(code in def)) {
-				if (assign === ':') {
-					if (c.defineParams) value.replace(c.defineParams, function(m, param, v) {
-						def[code] = {arg: param, text: v};
-					});
-					if (!(code in def)) def[code]= value;
-				} else {
-					new Function("def", "def['"+code+"']=" + value)(def);
-				}
-			}
-			return '';
-		})
-		.replace(c.use || skip, function(m, code) {
-			if (c.useParams) code = code.replace(c.useParams, function(m, s, d, param) {
-				if (def[d] && def[d].arg && param) {
-					var rw = (d+":"+param).replace(/'|\\/g, '_');
-					def.__exp = def.__exp || {};
-					def.__exp[rw] = def[d].text.replace(new RegExp("(^|[^\\w$])" + def[d].arg + "([^\\w$])", "g"), "$1" + param + "$2");
-					return s + "def.__exp['"+rw+"']";
-				}
-			});
-			var v = new Function("def", "return " + code)(def);
-			return v ? resolveDefs(c, v, def) : v;
-		});
-	}
-
-	function unescape(code) {
-		return code.replace(/\\('|\\)/g, "$1").replace(/[\r\t\n]/g, ' ');
-	}
-
-	doT.template = function(tmpl, c, def) {
-		c = c || doT.templateSettings;
-		var cse = c.append ? startend.append : startend.split, needhtmlencode, sid = 0, indv,
-			str  = (c.use || c.define) ? resolveDefs(c, tmpl, def || {}) : tmpl;
-
-		str = ("var out='" + (c.strip ? str.replace(/(^|\r|\n)\t* +| +\t*(\r|\n|$)/g,' ')
-					.replace(/\r|\n|\t|\/\*[\s\S]*?\*\//g,''): str)
-			.replace(/'|\\/g, '\\$&')
-			.replace(c.interpolate || skip, function(m, code) {
-				return cse.start + unescape(code) + cse.end;
-			})
-			.replace(c.encode || skip, function(m, code) {
-				needhtmlencode = true;
-				return cse.start + unescape(code) + cse.endencode;
-			})
-			.replace(c.conditional || skip, function(m, elsecase, code) {
-				return elsecase ?
-					(code ? "';}else if(" + unescape(code) + "){out+='" : "';}else{out+='") :
-					(code ? "';if(" + unescape(code) + "){out+='" : "';}out+='");
-			})
-			.replace(c.iterate || skip, function(m, iterate, vname, iname) {
-				if (!iterate) return "';} } out+='";
-				sid+=1; indv=iname || "i"+sid; iterate=unescape(iterate);
-				return "';var arr"+sid+"="+iterate+";if(arr"+sid+"){var "+vname+","+indv+"=-1,l"+sid+"=arr"+sid+".length-1;while("+indv+"<l"+sid+"){"
-					+vname+"=arr"+sid+"["+indv+"+=1];out+='";
-			})
-			.replace(c.evaluate || skip, function(m, code) {
-				return "';" + unescape(code) + "out+='";
-			})
-			+ "';return out;")
-			.replace(/\n/g, '\\n').replace(/\t/g, '\\t').replace(/\r/g, '\\r')
-			.replace(/(\s|;|\}|^|\{)out\+='';/g, '$1').replace(/\+''/g, '')
-			.replace(/(\s|;|\}|^|\{)out\+=''\+/g,'$1out+=');
-
-		if (needhtmlencode && c.selfcontained) {
-			str = "String.prototype.encodeHTML=(" + encodeHTMLSource.toString() + "());" + str;
-		}
-		try {
-			return new Function(c.varname, str);
-		} catch (e) {
-			if (typeof console !== 'undefined') console.log("Could not create a template function: " + str);
-			throw e;
-		}
-	};
-
-	doT.compile = function(tmpl, def) {
-		return doT.template(tmpl, null, def);
-	};
-}());
 /** MIT License (c) copyright 2010-2013 B Cavalier & J Hann */
 
 /**
@@ -11314,64 +11307,6 @@ define('curl/plugin/style', function () {
 
 	return createStyle;
 });
-/*
- * Copyright 2012 the original author or authors
- * @license MIT, see LICENSE.txt for details
- *
- * @author Scott Andrews
- */
-
-(function (define) {
-	'use strict';
-
-	define('rest/mime/type/text/plain', ['require'], function () {
-
-		return {
-
-			read: function (str) {
-				return str;
-			},
-
-			write: function (obj) {
-				return obj.toString();
-			}
-
-		};
-	});
-
-}(
-	typeof define === 'function' && define.amd ? define : function (factory) { module.exports = factory(require); }
-	// Boilerplate for AMD and Node
-));
-/*
- * Copyright 2012 the original author or authors
- * @license MIT, see LICENSE.txt for details
- *
- * @author Scott Andrews
- */
-
-(function (define) {
-	'use strict';
-
-	define('rest/mime/type/application/json', ['require'], function () {
-
-		return {
-
-			read: function (str) {
-				return JSON.parse(str);
-			},
-
-			write: function (obj) {
-				return JSON.stringify(obj);
-			}
-
-		};
-	});
-
-}(
-	typeof define === 'function' && define.amd ? define : function (factory) { module.exports = factory(require); }
-	// Boilerplate for AMD and Node
-));
 /** @license MIT License (c) copyright 2011-2013 original author or authors */
 
 /**
@@ -12394,9 +12329,321 @@ define('when/when', ['require'], function (require) {
 	typeof define === 'function' && define.amd ? define : function (factory) { module.exports = factory(require); }
 	// Boilerplate for AMD and Node
 ));
+/*
+ * Copyright 2012 the original author or authors
+ * @license MIT, see LICENSE.txt for details
+ *
+ * @author Scott Andrews
+ */
+
+(function (define) {
+	'use strict';
+
+	define('rest/mime/type/text/plain', ['require'], function () {
+
+		return {
+
+			read: function (str) {
+				return str;
+			},
+
+			write: function (obj) {
+				return obj.toString();
+			}
+
+		};
+	});
+
+}(
+	typeof define === 'function' && define.amd ? define : function (factory) { module.exports = factory(require); }
+	// Boilerplate for AMD and Node
+));
+/*
+ * Copyright 2012 the original author or authors
+ * @license MIT, see LICENSE.txt for details
+ *
+ * @author Scott Andrews
+ */
+
+(function (define) {
+	'use strict';
+
+	define('rest/mime/type/application/json', ['require'], function () {
+
+		return {
+
+			read: function (str) {
+				return JSON.parse(str);
+			},
+
+			write: function (obj) {
+				return JSON.stringify(obj);
+			}
+
+		};
+	});
+
+}(
+	typeof define === 'function' && define.amd ? define : function (factory) { module.exports = factory(require); }
+	// Boilerplate for AMD and Node
+));
+
+;define('theme/postList', ['curl/plugin/style', 'require'], function (injector, require) { var text = ".posts {\r\n\r\n    color: #666;\r\n}\r\n\r\n.posts .tag-top {\r\n\r\n    font-size: 1em;\r\n    margin-bottom: 72px;\r\n}\r\n\r\n.posts .tag-top>span {\r\n\r\n    padding: .5em;\r\n    border-radius: .5em;\r\n    background: #666;\r\n    color: #fff;\r\n    box-shadow: 0 60px 20px rgba(0,0,0,0.1);\r\n}\r\n\r\n.posts .title h1 {\r\n\r\n    color: #333;\r\n}\r\n\r\n.posts .title p {\r\n\r\n    color: #aaa;\r\n    font-size: 12px;\r\n    margin: 5px 0 3px 3px;\r\n}\r\n\r\n.posts .preview {\r\n\r\n    padding: 6px 18px;\r\n}\r\n\r\n.posts .more {\r\n\r\n    color: #fff;\r\n    background-color: #333;\r\n    position: relative;\r\n    display: block;\r\n    padding: 10px 15px;\r\n    border-radius: 4px;\r\n    text-align: center;\r\n}\r\n\r\n.posts .more:hover {\r\n\r\n    background-color: #8cf2e3;\r\n}\r\n\r\n.posts .pagers {\r\n\r\n    text-align: center;\r\n    border-top: 1px solid #333;\r\n    margin-top: 40px;\r\n    padding-top: 40px;\r\n}\r\n\r\n.posts .pagers a {\r\n\r\n    display: inline-block;\r\n    width: 40px;\r\n    height: 40px;\r\n    border-radius: 40px;\r\n    background: #333;\r\n    color: #fff;\r\n    line-height: 40px;\r\n}\r\n\r\n.posts .pagers a:hover {\r\n\r\n    background: #84fbca;\r\n}\r\n\r\n.icon.new, .icon.old {\r\n    margin:0;\r\n}\r\n\r\n.icon.new:before {\r\n    content:'\\e60b';\r\n}\r\n\r\n.icon.old:before {\r\n    content:'\\e60c';\r\n}\r\n\r\n.posts .icon.tag:before {\r\n    content: '\\e603';\r\n}\r\n\r\n.posts .icon.query:before {\r\n    content: '\\e60f';\r\n}"; if (0) text = injector.translateUrls(text, require.toUrl("")); return text; });
+define('curl/plugin/css!theme/postList', ['curl/plugin/style!theme/postList'], function (sheet) { return sheet; });
 
 ;define('theme/tags', ['curl/plugin/style', 'require'], function (injector, require) { var text = "section.tag-list ul {\r\n\r\n\tpadding-left: 0;\r\n}\r\n\r\nsection.tag-list div {\r\n\r\n\tdisplay: inline-block;\r\n}\r\n\r\nsection.tag-list li {\r\n\r\n\tfont-size: 18px;\r\n\tfont-weight: bold;\r\n\tmargin:8px;\r\n\tlist-style: none;\r\n}\r\n\r\nsection.tag-list .icon:before {\r\n\r\n\tcontent: \"\\e603\";\r\n}\r\n\r\nsection.tag-list a {\r\n\r\n\tdisplay: inline-block;\r\n\tborder: 1px solid #333;\r\n\tborder-radius: 4px;\r\n\tpadding: .2em .7em .2em .4em;\r\n}\r\n\r\nsection.tag-list .count {\r\n\r\n\r\n\tdisplay: inline-block;\r\n\tvisibility: visible;\r\n\tmin-width: 10px;\r\n\tpadding: 3px 7px;\r\n\tfont-size: 12px;\r\n\tfont-weight: 700;\r\n\tcolor: #fff;\r\n\tline-height: 1;\r\n\tvertical-align: baseline;\r\n\twhite-space: nowrap;\r\n\ttext-align: center;\r\n\tbackground-color: #8cf2e3;\r\n\tborder-radius: 10px;\r\n\tposition: relative;\r\n\ttop: -1.5em;\r\n\tleft: -0.5em;\r\n}\r\n\r\nsection.tag-list div:hover .count {\r\n\r\n\tvisibility: visible;\r\n}\r\n\r\nsection.tag-list div:hover a {\r\n\r\n\tbackground: #8cf2e3;\r\n\tborder-color:#8cf2e3;\r\n\tcolor: #fff;\r\n}\r\n\r\n@media (min-width: 400px) {\r\n\r\n\tsection.tag-list li {\r\n\t\tdisplay: inline-block;\r\n\t}\r\n}"; if (0) text = injector.translateUrls(text, require.toUrl("")); return text; });
 define('curl/plugin/css!theme/tags', ['curl/plugin/style!theme/tags'], function (sheet) { return sheet; });
+
+;define('theme/gotop', ['curl/plugin/style', 'require'], function (injector, require) { var text = ".go-top .icon:before {\r\n\tcontent:'\\e612';\r\n}\r\n\r\n.go-top {\r\n\tdisplay: none;\r\n\tposition: fixed;\r\n\tz-index: 9999;\r\n\ttop: 8px;\r\n\tright: 8px;\r\n\tcolor:#333;\r\n\tfont-size: 20px;\r\n\topacity: 0;\r\n\theight: 0;\r\n\ttext-shadow: 0 40px 16px rgba(0,0,0,0.4);\r\n\tcursor: pointer;\r\n}\r\n\r\n@media (min-width: 768px) {\r\n\r\n\t.go-top:hover {\r\n\t\tcolor: #8cf2e3;\r\n\t}\r\n}"; if (0) text = injector.translateUrls(text, require.toUrl("")); return text; });
+define('curl/plugin/css!theme/gotop', ['curl/plugin/style!theme/gotop'], function (sheet) { return sheet; });
+
+;define('theme/error', ['curl/plugin/style', 'require'], function (injector, require) { var text = "section.error h1 {\r\n\r\n   margin: 30px 0;\r\n   color: #666;\r\n   font-size: 1.2em;\r\n   color: #333;\r\n}\r\n\r\nsection.error {\r\n\r\n    padding: 30px 15px 110px 20px;\r\n    font-size: 16px;\r\n}\r\n\r\nsection.error .icon:before{\r\n\tcontent:'\\e60a';\r\n}"; if (0) text = injector.translateUrls(text, require.toUrl("")); return text; });
+define('curl/plugin/css!theme/error', ['curl/plugin/style!theme/error'], function (sheet) { return sheet; });
+
+;define('theme/about', ['curl/plugin/style', 'require'], function (injector, require) { var text = "section.about {\r\n\twidth: 100%;\r\n\tmin-height: 600px;\r\n\ttext-align: center;\r\n\tpadding-left: 0;\r\n\tpadding-right: 0;\r\n\tcolor:#999;\r\n\tfont-size: 12px;\r\n}\r\n\r\nsection.about .content {\r\n\r\n\tmax-width: 620px;\r\n\tmargin:0 auto;\r\n\tpadding: 0 20px;\r\n}\r\n\r\nsection.about h1 {\r\n\tcolor:#333;\r\n\tfont-size: 200%;\r\n}\r\n\r\nsection.about h2 {\r\n\r\n\tfont-size: 120%;\r\n}\r\n\r\nsection.about ul {\r\n\r\n\tpadding-left: 0;\r\n}\r\n\r\nsection.about li {\r\n\r\n\tlist-style: none;\r\n\tdisplay: inline-block;\r\n\tfont-size: 140%;\r\n\tmargin-right: .5em;\r\n}\r\n\r\nsection.about img {\r\n\r\n\tmax-width: 50%;\r\n}\r\n\r\n.icon.beer:before {\r\n\r\n\tcontent: '\\e617';\r\n}\r\n\r\n.icon.git:before {\r\n\tcontent: '\\e601';\r\n}\r\n\r\n.icon.weibo:before {\r\n\r\n\tcontent: '\\e600';\r\n}\r\n\r\n.icon.fb:before {\r\n\r\n\tcontent: '\\e60d';\r\n}\r\n\r\n.icon.linkedin:before {\r\n\r\n\tcontent: '\\e613';\r\n}\r\n\r\n.icon.mail:before {\r\n\r\n\tcontent: '\\e614';\r\n}"; if (0) text = injector.translateUrls(text, require.toUrl("")); return text; });
+define('curl/plugin/css!theme/about', ['curl/plugin/style!theme/about'], function (sheet) { return sheet; });
+
+;define('theme/nav', ['curl/plugin/style', 'require'], function (injector, require) { var text = ".top-banner {\r\n    margin-bottom: 0;\r\n    background-color: #fff;\r\n    color: #333;\r\n    border-bottom: 0;\r\n    position: relative;\r\n    min-height: 50px;\r\n    border: 1px solid transparent;\r\n    z-index: 1001;\r\n}\r\n\r\n.top-banner a {\r\n\r\n    color: #333;\r\n}\r\n\r\n.top-banner .container {\r\n\r\n    margin-right: auto;\r\n    margin-left: auto;\r\n    padding-left: 15px;\r\n    padding-right: 15px;\r\n}\r\n\r\n.nav-header, .top-banner .navbar-collapse {\r\n\r\n    margin-right: -15px;\r\n    margin-left: -15px;\r\n}\r\n\r\n .nav-header:after, .navbar-collapse:after, .navbar-nav:after {\r\n    content:\"\";\r\n    display: table;\r\n    clear: both;\r\n}\r\n\r\n .menu-toggle {\r\n    position: relative;\r\n    float: right;\r\n    margin-right: 15px;\r\n    padding: 9px 10px;\r\n    margin-top: 8px;\r\n    margin-bottom: 8px;\r\n    background-color: transparent;\r\n    background-image: none;\r\n    border: 1px solid transparent;\r\n    border-radius: 4px;\r\n    cursor: pointer;\r\n}\r\n\r\n .icon-toggle {\r\n\r\n    display: block;\r\n    width: 22px;\r\n    height: 2px;\r\n    border-radius: 1px;\r\n    background: #666;\r\n}\r\n .icon-toggle+.icon-toggle {\r\n    margin-top: 4px;\r\n}\r\n\r\n\r\n .navbar-brand {\r\n\r\n    font-family: third-font;\r\n    font-weight: 500;\r\n    float: left;\r\n    padding: 15px;\r\n    font-size: 18px;\r\n    line-height: 20px;\r\n    height: 50px;\r\n}\r\n\r\n .navbar-collapse {\r\n\r\n    padding-right: 15px;\r\n    padding-left: 15px;\r\n    border-top: 1px solid transparent;\r\n    box-shadow: inset 0 1px 0 rgba(255,255,255,.1);\r\n    height: 0;\r\n    overflow-y: hidden;\r\n    overflow-x: visible;\r\n}\r\n\r\n .navbar-nav {\r\n\r\n    margin: 7.5px -15px;\r\n    padding-left: 0;\r\n    list-style: none;\r\n}\r\n\r\n .navbar-nav>li {\r\n\r\n    position: relative;\r\n    display: block;\r\n}\r\n\r\n .navbar-nav>li>* {\r\n\r\n    position: relative;\r\n    display: block;\r\n    padding: 10px 15px;\r\n}\r\n\r\n .icon.tags:before {\r\n    content: '\\e605';\r\n }\r\n\r\n  .icon.about:before {\r\n    content: '\\e608';\r\n }\r\n  .icon.demos:before {\r\n    content: '\\e610';\r\n }\r\n\r\n .navbar-nav input {\r\n    display: block;\r\n    width: 100%;\r\n    height: 34px;\r\n    padding: 4px 8px;\r\n    font-size: 14px;\r\n    line-height: 1.42857143;\r\n    color: #555;\r\n    background: #eee;\r\n    border-color: #ddd;\r\n    background-image: none;\r\n    border: 1px solid #ccc;\r\n    border-radius: 4px;\r\n    box-shadow: inset 0 1px 1px rgba(0,0,0,.075);\r\n    -webkit-transition: border-color ease-in-out .15s,box-shadow ease-in-out .15s;\r\n    -ms-transition: border-color ease-in-out .15s,box-shadow ease-in-out .15s;\r\n    -moz-transition: border-color ease-in-out .15s,box-shadow ease-in-out .15s;\r\n    -o-transition: border-color ease-in-out .15s,box-shadow ease-in-out .15s;\r\n    transition: border-color ease-in-out .15s,box-shadow ease-in-out .15s;\r\n}\r\n\r\n .navbar-nav input:focus {\r\n\r\n    box-shadow: inset 0 1px 1px rgba(0,0,0,.5),0 0 11px rgba(0,0,0,.7);\r\n}\r\n\r\n .navbar-nav input.error {\r\n\r\n    background: #f97274;\r\n}\r\n\r\n@media (min-width: 768px) {\r\n\r\n    .top-banner .container {\r\n\r\n        width: 720px;\r\n    }\r\n\r\n     .menu-toggle {\r\n\r\n        display: none;\r\n    }\r\n\r\n     .nav-header {\r\n\r\n        float: left;\r\n    }\r\n\r\n     .navbar-collapse {\r\n\r\n        margin-right: 0;\r\n        margin-left: 0;\r\n        padding-left: 0;\r\n        padding-right: 0;\r\n        width: auto;\r\n        border-top: 0;\r\n        box-shadow: none;\r\n    }\r\n\r\n     .navbar-collapse.collapse {\r\n        display: block!important;\r\n        height: auto!important;\r\n        padding-bottom: 0;\r\n        overflow: visible!important;\r\n    }\r\n\r\n     .navbar-nav {\r\n\r\n        margin: 0;\r\n        float: right!important;\r\n    }\r\n\r\n     .navbar-nav>li {\r\n\r\n        float: left;\r\n    }\r\n\r\n     .navbar-nav>li>a {\r\n\r\n        padding-top: 15px;\r\n        padding-bottom: 15px;\r\n    }\r\n\r\n    .navbar-nav input {\r\n\r\n        padding-top: 2px;\r\n        padding-bottom: 2px;\r\n        width:310px;\r\n    }\r\n\r\n     .menu-toggle:hover {\r\n\r\n        background: #649def;\r\n    }\r\n}"; if (0) text = injector.translateUrls(text, require.toUrl("")); return text; });
+define('curl/plugin/css!theme/nav', ['curl/plugin/style!theme/nav'], function (sheet) { return sheet; });
+
+;define('theme/post', ['curl/plugin/style', 'require'], function (injector, require) { var text = "code,\r\nkbd,\r\npre,\r\nsamp {\r\n  font-family: Menlo, Monaco, Consolas, \"Courier New\", monospace;\r\n}\r\ncode {\r\n  padding: 2px 4px;\r\n  font-size: 90%;\r\n  color: #c7254e;\r\n  white-space: pre-wrap;\r\n  background-color: #f9f2f4;\r\n  border-radius: 4px;\r\n}\r\nkbd {\r\n  padding: 2px 4px;\r\n  font-size: 90%;\r\n  color: #fff;\r\n  background-color: #333;\r\n  border-radius: 3px;\r\n  box-shadow: inset 0 -1px 0 rgba(0, 0, 0, .25);\r\n}\r\npre {\r\n  display: block;\r\n  padding: 9.5px;\r\n  margin: 0 0 10px;\r\n  font-size: 13px;\r\n  line-height: 1.42857143;\r\n  color: #333;\r\n  word-break: break-all;\r\n  word-wrap: break-word;\r\n  background-color: #f5f5f5;\r\n  border: 1px solid #ccc;\r\n  border-radius: 4px;\r\n}\r\npre code {\r\n  padding: 0;\r\n  font-size: inherit;\r\n  color: inherit;\r\n  white-space: pre-wrap;\r\n  background-color: transparent;\r\n  border-radius: 0;\r\n}\r\n\r\n.post {\r\n\r\n  color: #666;\r\n}\r\n\r\n.post p, .post li {\r\n\r\n  font-size: 13px;\r\n}\r\n\r\n.post .title h1 {\r\n  font-size: 30px;\r\n  color: #333;\r\n}\r\n\r\n.post .title p {\r\n\r\n  color: #aaa;\r\n  font-size: 12px;\r\n  margin: 5px 0 3px 3px;\r\n}\r\n\r\n.post .content {\r\n\r\n  margin: 10px 0 0 3px;\r\n  border-top: 1px solid #333;\r\n}\r\n\r\n.post .foot {\r\n  text-align: center;\r\n  padding: 15px 20px 50px 20px;\r\n  margin: 50px 0 0;\r\n}\r\n\r\n.post .foot p {\r\n\r\n  font-size: 15px;\r\n  font-weight: bold;\r\n  color: #333;\r\n  margin: 5px auto;\r\n}\r\n\r\n.post .foot ul {\r\n\r\n  padding:0;\r\n}\r\n\r\n.post .foot li {\r\n\r\n  list-style: none;\r\n  display: inline-block;\r\n  font-size: 11px;\r\n  margin:0 3px;\r\n}\r\n\r\n.post .foot a {\r\n\r\n  display: inline-block;\r\n  color: #333;\r\n  border: 1px solid #333;\r\n  border-radius: 4px;\r\n  padding: .2em .7em .15em .4em;\r\n}\r\n\r\n.post .foot a:hover {\r\n\r\n  background: #8cf2e3;\r\n  border-color:#8cf2e3;\r\n  color: #fff;\r\n}\r\n\r\n.post .icon:before {\r\n  content: '\\e603';\r\n}\r\n\r\n.post em {\r\n\r\n  font-size: 10px;\r\n  display: block;\r\n  font-weight: 900;\r\n  text-align: center;\r\n  margin-bottom: 10px;\r\n}\r\n\r\n.post a {\r\n\r\n  color: #4671e3;\r\n}"; if (0) text = injector.translateUrls(text, require.toUrl("")); return text; });
+define('curl/plugin/css!theme/post', ['curl/plugin/style!theme/post'], function (sheet) { return sheet; });
+
+;define('theme/foot', ['curl/plugin/style', 'require'], function (injector, require) { var text = "footer {\r\n    padding-top: 40px;\r\n    padding-bottom: 40px;\r\n    text-align: center;\r\n    background: url( 'http://renchi.qiniudn.com/birds.svg');\r\n    background-size:cover;\r\n    background-position: 50% 0%;\r\n    background-repeat: no-repeat;\r\n    background-color: #fff;\r\n    color: #000;\r\n    font-family: third-font, sans-serif;\r\n}\r\n\r\nfooter img {\r\n\r\n    width: 80px;\r\n    height: 80px;\r\n    border-radius: 80px;\r\n}\r\n\r\nfooter h1, footer h2, footer p {\r\n\r\n    margin:0;\r\n}\r\n\r\nfooter h1 {\r\n\r\n    font-size: 40px;\r\n}\r\n\r\nfooter p {\r\n\r\n    font-size: 20px;\r\n}"; if (0) text = injector.translateUrls(text, require.toUrl("")); return text; });
+define('curl/plugin/css!theme/foot', ['curl/plugin/style!theme/foot'], function (sheet) { return sheet; });
+
+;define('app/utils/transition', ['jquery/jquery'], function (
+    $
+
+) {
+'use strict';
+
+    var exports = {};
+
+    var transitionEnd = function () {
+
+        var el = document.createElement( 'bootstrap' );
+
+        var transEndEventNames = {
+            'WebkitTransition': 'webkitTransitionEnd',
+            'MozTransition':    'transitionend',
+            'OTransition':      'oTransitionEnd otransitionend',
+            'transition':       'transitionend'
+        };
+
+        for ( var name in transEndEventNames ) {
+
+            if ( el.style[ name ] !== undefined ) {
+                exports.vendor = name.replace( /transition/i, '' ).toLowerCase();
+                return transEndEventNames[ name ];
+            }
+        }
+        exports.vendor = null;
+        return false;
+    };
+
+
+    $.fn.emulateTransitionEnd = function ( duration ) {
+
+        var called = false;
+        var $el = this;
+        var callback = function () {
+            if ( !called ) $( $el ).trigger( $.support.transition );
+        };
+
+        $( this ).one( $.support.transition, function () { called = true } );
+
+        setTimeout( callback, duration );
+        return this;
+    };
+
+    $( function () {
+        $.support.transition = transitionEnd();
+    });
+
+    // return a numb
+    return null;
+});
+
+;define('app/partials/page', ['curl/plugin/text!app/tpls/postList.html', 'theme/postList', 'doT/doT', 'jquery/jquery'], function (
+    tplStr, dumbStyle, doT, $
+) {
+'use strict';
+
+    var exports = {};
+    var $view;
+    var tpl = doT.template( tplStr );
+
+    var main = function() {
+
+        exports.init   = init;
+        exports.render = render;
+    };
+
+    var init = function( view ) {
+
+        $view = $( view );
+    };
+
+    var render = function( data ) {
+
+        $view.html( tpl( data ) );
+    };
+
+    main();
+    return exports;
+});
+
+;define('app/partials/error', ['theme/error', 'jquery/jquery'], function (
+    dumbStyle, $
+) {
+'use strict';
+
+    /**
+     * title
+     * @created date
+     * @author chillicomputer@gmail.com
+     */
+
+    var exports = {};
+    var $viewDom;
+
+    var main = function() {
+
+        exports.init = init;
+        exports.render = render;
+    };
+
+    var init = function( container ) {
+
+        $viewDom = $( container );
+    };
+
+    var render = function( msg ) {
+
+        $viewDom.html( '<section class="error"><h1>糟糕，程序出现了问题。</h1><span class="icon confuse"></span>'+ msg + '</section>' );
+    };
+
+    main();
+
+    return exports;
+});
+
+;define('app/partials/gotop', ['theme/gotop', 'tween/Tween.js', 'app/utils/animationFrame', 'jquery/jquery'], function (
+	dumbStyle, TWEEN, animationFrame, $
+) {
+'use strict';
+
+	var $view;
+	var exports = {};
+	var _timer;
+	var _request = animationFrame.request;
+
+	var main = function() {
+
+		setTimeout( function() {
+
+			$view = $( '<div class="go-top"><span class="icon"></span></div>' ).appendTo( $( 'body') );
+
+			$view.click( function() {
+
+				scrollToTop();
+			});
+
+			window.onscroll = function( e ) {
+
+				if ( !$view.data( 'show' ) && window.scrollY > window.innerHeight ) {
+
+					$view.show().data( 'show', 1 );
+
+					if ( /Mobile/.test(navigator.userAgent) ) $view.css( 'opacity', 1 );
+					else {
+						_timer && clearTimeout( _timer );
+						_timer = setTimeout( function() {
+							$view.animate( { opacity: 1 }, 350 );
+						}, 200 );
+					}
+				}
+
+				if ( $view.data( 'show' ) && window.scrollY <= window.innerHeight ) {
+
+					$view.data( 'show', 0 );
+
+					if ( /Mobile/.test(navigator.userAgent) ) $view.hide();
+					else {
+						_timer && clearTimeout( _timer );
+						_timer = setTimeout( function() {
+							$view.animate( { opacity: 0}, 350, function() {
+								$view.hide();
+							});
+						}, 200 );
+					}
+				}
+			};
+
+			exports.scrollToTop = scrollToTop;
+		}, 0);
+	};
+
+	var scrollToTop = function() {
+
+		var position = { y: window.scrollY };
+		var update = function() {
+
+			window.scrollTo( 0, position.y );
+		};
+		var tween = new TWEEN.Tween( position )
+			.to( { y: 0 }, 600 )
+			.delay( 50 )
+			.easing( TWEEN.Easing.Cubic.InOut )
+			.onUpdate( update );
+
+		var animate = function() {
+
+			position.y > 0 && _request( animate );
+			TWEEN.update();
+		};
+
+		tween.start();
+		animate();
+	};
+
+	main();
+
+	return exports;
+});
+
+;define('app/partials/tags', ['curl/plugin/text!app/tpls/tags.html', 'theme/tags', 'doT/doT', 'jquery/jquery'], function (
+	tplStr, dumbStyle, doT, $
+) {
+'use strict';
+
+	var exports = {};
+	var $view;
+	var tpl = doT.template( tplStr );
+
+	var main = function() {
+
+		exports.init = init;
+		exports.render = render;
+	};
+
+	var init = function( view ) {
+
+		$view = $( view );
+		if ( !('ontouchstart' in document.body ) ) {
+			$( '<style>section.tag-list .count {visibility:hidden;}</style>' ).appendTo( $( 'head' ) );
+		}
+	};
+
+	var render = function( data ) {
+
+		$view.html( tpl( data ) );
+	};
+
+	main();
+	return exports;
+});
 /*
  * Copyright 2012-2013 the original author or authors
  * @license MIT, see LICENSE.txt for details
@@ -12528,6 +12775,101 @@ define('curl/plugin/css!theme/tags', ['curl/plugin/style!theme/tags'], function 
 	typeof define === 'function' && define.amd ? define : function (factory) { module.exports = factory(require); }
 	// Boilerplate for AMD and Node
 ));
+
+;define('app/partials/about', ['curl/plugin/text!app/tpls/about.html', 'theme/about', 'jquery/jquery'], function (
+	tplStr, dumbStyle, $
+) {
+'use strict';
+
+	var exports = {};
+	var $view;
+
+	var main = function() {
+
+		exports.init = init;
+		exports.render = render;
+	};
+
+	var init = function( view ) {
+
+		$view = $( view );
+	};
+
+	var render = function() {
+
+		$view.html( tplStr );
+	};
+
+	main();
+	return exports;
+});
+
+;define('app/partials/post', ['curl/plugin/text!app/tpls/post.html', 'theme/post', 'app/partials/mathjax', 'doT/doT', 'jquery/jquery'], function (
+	tplStr, dumbStyle, mathjax, doT, $
+) {
+'use strict';
+
+	var exports = {};
+	var $view;
+	var tpl = doT.template( tplStr );
+
+	var main = function() {
+
+		exports.init = init;
+		exports.render = render;
+	};
+
+	var init = function( view ) {
+
+		$view = $( view );
+	};
+
+	var render = function( data ) {
+
+		$view.html( tpl( data ) );
+
+		// MathJax
+		mathjax.queue( $( 'section.post' )[0] );
+	};
+
+	main();
+	return exports;
+});
+
+;define('app/partials/foot', ['curl/plugin/text!app/tpls/foot.html', 'theme/foot', 'jquery/jquery'], function (
+    footTplStr, dumbStyle, $
+) {
+'use strict';
+
+    /**
+     * title
+     * @created date
+     * @author chillicomputer@gmail.com
+     */
+
+    var exports = {};
+    var $foot;
+
+    var main = function() {
+
+        exports.init   = init;
+        exports.getDom = getDom;
+    };
+
+    var init = function( container ) {
+
+        $foot = $( footTplStr ).appendTo( container );
+    };
+
+    var getDom = function() {
+
+        return $foot;
+    };
+
+    main();
+
+    return exports;
+});
 /*
  * Copyright 2012 the original author or authors
  * @license MIT, see LICENSE.txt for details
@@ -12574,134 +12916,115 @@ define('curl/plugin/css!theme/tags', ['curl/plugin/style!theme/tags'], function 
 	// Boilerplate for AMD and Node
 ));
 
-;define('theme/error', ['curl/plugin/style', 'require'], function (injector, require) { var text = "section.error h1 {\r\n\r\n   margin: 30px 0;\r\n   color: #666;\r\n   font-size: 1.2em;\r\n   color: #333;\r\n}\r\n\r\nsection.error {\r\n\r\n    padding: 30px 15px 110px 20px;\r\n    font-size: 16px;\r\n}\r\n\r\nsection.error .icon:before{\r\n\tcontent:'\\e60a';\r\n}"; if (0) text = injector.translateUrls(text, require.toUrl("")); return text; });
-define('curl/plugin/css!theme/error', ['curl/plugin/style!theme/error'], function (sheet) { return sheet; });
-
-;define('app/partials/tags', ['curl/plugin/text!app/tpls/tags.html', 'theme/tags', 'doT/doT', 'jquery/jquery'], function (
-	tplStr, dumbStyle, doT, $
+;define('app/partials/nav', ['curl/plugin/text!app/tpls/nav.html', 'app/utils/transition', 'theme/nav', 'jquery/jquery'], function (
+    tplStr, transition, dumbStyle, $
 ) {
 'use strict';
-
-	var exports = {};
-	var $view;
-	var tpl = doT.template( tplStr );
-
-	var main = function() {
-
-		exports.init = init;
-		exports.render = render;
-	};
-
-	var init = function( view ) {
-
-		$view = $( view );
-		if ( !('ontouchstart' in document.body ) ) {
-			$( '<style>section.tag-list .count {visibility:hidden;}</style>' ).appendTo( $( 'head' ) );
-		}
-	};
-
-	var render = function( data ) {
-
-		$view.html( tpl( data ) );
-	};
-
-	main();
-	return exports;
-});
-
-;define('app/partials/error', ['theme/error', 'jquery/jquery'], function (
-    dumbStyle, $
-) {
-'use strict';
-
-    /**
-     * title
-     * @created date
-     * @author chillicomputer@gmail.com
-     */
 
     var exports = {};
-    var $viewDom;
+    var aniBusy;
+    var inited;
+    var $view;
+    var $input;
 
     var main = function() {
 
-        exports.init = init;
-        exports.render = render;
+        exports.isInited = function() {
+            return inited;
+        };
+        exports.init   = init;
+        exports.show   = _handlers.show;
+        exports.hide   = _handlers.hide;
+        exports.getDom = geDom;
     };
 
     var init = function( container ) {
 
-        $viewDom = $( container );
+        $view = $( tplStr )
+        $view.prependTo( container );
+        $input = $( '[name=q]', $view );
+
+        _listen();
+
+        inited = true;
     };
 
-    var render = function( msg ) {
+    var geDom = function() {
 
-        $viewDom.html( '<section class="error"><h1>糟糕，程序出现了问题。</h1><span class="icon confuse"></span>'+ msg + '</section>' );
+        return $view;
+    };
+
+    var _handlers = {
+
+        show: function( cb, notani ) {
+
+            if( $view.data( 'folded' ) ) return;
+            _listeners.toggle( null, cb, notani );
+        },
+
+        hide: function( cb, notani ) {
+
+            if( !$view.data( 'folded' ) ) return;
+            _listeners.toggle( null, cb, notani );
+        }
+    };
+
+    var _listen = function() {
+
+        $( 'button', $view ).click( _listeners.toggle );
+        $( 'form', $view ).submit( _listeners.search );
+    };
+
+    var _listeners = {
+
+        toggle: function( e, cb, notani ) {
+
+            var isFold     = $view.data( 'folded' );
+            var $menu      = $( '.navbar-collapse', $view );
+
+            if ( notani ) {
+
+                $view.data( 'folded', !isFold );
+                $menu.height( !isFold ? $menu[0].scrollHeight : 0  );
+                return;
+            }
+
+            if ( aniBusy ) return;
+
+            aniBusy = true;
+
+            $menu.animate(
+                { height: !isFold ? $menu[0].scrollHeight : 0 },
+                350,
+                'swing',
+                function() {
+                    aniBusy = false;
+                    $view.data( 'folded', !isFold );
+                    typeof cb == 'function' && cb.call( $view );
+                }
+            );
+        },
+
+        search: function( e ) {
+
+            var q = $input.val().trim();
+
+            if ( !q ) {
+
+                $input.addClass( 'error' );
+                return false;
+            }
+
+            $input.removeClass( 'error' );
+            location.hash = '#/search/' + encodeURIComponent( q );
+            return false;
+        }
     };
 
     main();
 
     return exports;
 });
-
-;define('theme/post', ['curl/plugin/style', 'require'], function (injector, require) { var text = "code,\r\nkbd,\r\npre,\r\nsamp {\r\n  font-family: Menlo, Monaco, Consolas, \"Courier New\", monospace;\r\n}\r\ncode {\r\n  padding: 2px 4px;\r\n  font-size: 90%;\r\n  color: #c7254e;\r\n  white-space: pre-wrap;\r\n  background-color: #f9f2f4;\r\n  border-radius: 4px;\r\n}\r\nkbd {\r\n  padding: 2px 4px;\r\n  font-size: 90%;\r\n  color: #fff;\r\n  background-color: #333;\r\n  border-radius: 3px;\r\n  box-shadow: inset 0 -1px 0 rgba(0, 0, 0, .25);\r\n}\r\npre {\r\n  display: block;\r\n  padding: 9.5px;\r\n  margin: 0 0 10px;\r\n  font-size: 13px;\r\n  line-height: 1.42857143;\r\n  color: #333;\r\n  word-break: break-all;\r\n  word-wrap: break-word;\r\n  background-color: #f5f5f5;\r\n  border: 1px solid #ccc;\r\n  border-radius: 4px;\r\n}\r\npre code {\r\n  padding: 0;\r\n  font-size: inherit;\r\n  color: inherit;\r\n  white-space: pre-wrap;\r\n  background-color: transparent;\r\n  border-radius: 0;\r\n}\r\n\r\n.post {\r\n\r\n  color: #666;\r\n}\r\n\r\n.post p, .post li {\r\n\r\n  font-size: 13px;\r\n}\r\n\r\n.post .title h1 {\r\n  font-size: 30px;\r\n  color: #333;\r\n}\r\n\r\n.post .title p {\r\n\r\n  color: #aaa;\r\n  font-size: 12px;\r\n  margin: 5px 0 3px 3px;\r\n}\r\n\r\n.post .content {\r\n\r\n  margin: 10px 0 0 3px;\r\n  border-top: 1px solid #333;\r\n}\r\n\r\n.post .foot {\r\n  text-align: center;\r\n  padding: 15px 20px 50px 20px;\r\n  margin: 50px 0 0;\r\n}\r\n\r\n.post .foot p {\r\n\r\n  font-size: 15px;\r\n  font-weight: bold;\r\n  color: #333;\r\n  margin: 5px auto;\r\n}\r\n\r\n.post .foot ul {\r\n\r\n  padding:0;\r\n}\r\n\r\n.post .foot li {\r\n\r\n  list-style: none;\r\n  display: inline-block;\r\n  font-size: 11px;\r\n  margin:0 3px;\r\n}\r\n\r\n.post .foot a {\r\n\r\n  display: inline-block;\r\n  color: #333;\r\n  border: 1px solid #333;\r\n  border-radius: 4px;\r\n  padding: .2em .7em .15em .4em;\r\n}\r\n\r\n.post .foot a:hover {\r\n\r\n  background: #8cf2e3;\r\n  border-color:#8cf2e3;\r\n  color: #fff;\r\n}\r\n\r\n.post .icon:before {\r\n  content: '\\e603';\r\n}\r\n\r\n.post em {\r\n\r\n  font-size: 10px;\r\n  display: block;\r\n  font-weight: 900;\r\n  text-align: center;\r\n  margin-bottom: 10px;\r\n}\r\n\r\n.post a {\r\n\r\n  color: #4671e3;\r\n}"; if (0) text = injector.translateUrls(text, require.toUrl("")); return text; });
-define('curl/plugin/css!theme/post', ['curl/plugin/style!theme/post'], function (sheet) { return sheet; });
-
-;define('app/utils/transition', ['jquery/jquery'], function (
-    $
-
-) {
-'use strict';
-
-    var exports = {};
-
-    var transitionEnd = function () {
-
-        var el = document.createElement( 'bootstrap' );
-
-        var transEndEventNames = {
-            'WebkitTransition': 'webkitTransitionEnd',
-            'MozTransition':    'transitionend',
-            'OTransition':      'oTransitionEnd otransitionend',
-            'transition':       'transitionend'
-        };
-
-        for ( var name in transEndEventNames ) {
-
-            if ( el.style[ name ] !== undefined ) {
-                exports.vendor = name.replace( /transition/i, '' ).toLowerCase();
-                return transEndEventNames[ name ];
-            }
-        }
-        exports.vendor = null;
-        return false;
-    };
-
-
-    $.fn.emulateTransitionEnd = function ( duration ) {
-
-        var called = false;
-        var $el = this;
-        var callback = function () {
-            if ( !called ) $( $el ).trigger( $.support.transition );
-        };
-
-        $( this ).one( $.support.transition, function () { called = true } );
-
-        setTimeout( callback, duration );
-        return this;
-    };
-
-    $( function () {
-        $.support.transition = transitionEnd();
-    });
-
-    // return a numb
-    return null;
-});
-
-;define('theme/nav', ['curl/plugin/style', 'require'], function (injector, require) { var text = ".top-banner {\r\n    margin-bottom: 0;\r\n    background-color: #fff;\r\n    color: #333;\r\n    border-bottom: 0;\r\n    position: relative;\r\n    min-height: 50px;\r\n    border: 1px solid transparent;\r\n    z-index: 1001;\r\n}\r\n\r\n.top-banner a {\r\n\r\n    color: #333;\r\n    text-decoration: 1px solid;\r\n}\r\n\r\n.top-banner .container {\r\n\r\n    margin-right: auto;\r\n    margin-left: auto;\r\n    padding-left: 15px;\r\n    padding-right: 15px;\r\n}\r\n\r\n.nav-header, .top-banner .navbar-collapse {\r\n\r\n    margin-right: -15px;\r\n    margin-left: -15px;\r\n}\r\n\r\n .nav-header:after, .navbar-collapse:after, .navbar-nav:after {\r\n    content:\"\";\r\n    display: table;\r\n    clear: both;\r\n}\r\n\r\n .menu-toggle {\r\n    position: relative;\r\n    float: right;\r\n    margin-right: 15px;\r\n    padding: 9px 10px;\r\n    margin-top: 8px;\r\n    margin-bottom: 8px;\r\n    background-color: transparent;\r\n    background-image: none;\r\n    border: 1px solid transparent;\r\n    border-radius: 4px;\r\n    cursor: pointer;\r\n}\r\n\r\n .icon-toggle {\r\n\r\n    display: block;\r\n    width: 22px;\r\n    height: 2px;\r\n    border-radius: 1px;\r\n    background: #666;\r\n}\r\n .icon-toggle+.icon-toggle {\r\n    margin-top: 4px;\r\n}\r\n\r\n\r\n .navbar-brand {\r\n\r\n    font-family: third-font;\r\n    font-weight: 500;\r\n    float: left;\r\n    padding: 15px;\r\n    font-size: 18px;\r\n    line-height: 20px;\r\n    height: 50px;\r\n}\r\n\r\n .navbar-collapse {\r\n\r\n    padding-right: 15px;\r\n    padding-left: 15px;\r\n    border-top: 1px solid transparent;\r\n    box-shadow: inset 0 1px 0 rgba(255,255,255,.1);\r\n    height: 0;\r\n    overflow-y: hidden;\r\n    overflow-x: visible;\r\n}\r\n\r\n .navbar-nav {\r\n\r\n    margin: 7.5px -15px;\r\n    padding-left: 0;\r\n    list-style: none;\r\n}\r\n\r\n .navbar-nav>li {\r\n\r\n    position: relative;\r\n    display: block;\r\n}\r\n\r\n .navbar-nav>li>* {\r\n\r\n    position: relative;\r\n    display: block;\r\n    padding: 10px 15px;\r\n}\r\n\r\n .icon.tags:before {\r\n    content: '\\e605';\r\n }\r\n\r\n  .icon.about:before {\r\n    content: '\\e608';\r\n }\r\n  .icon.demos:before {\r\n    content: '\\e610';\r\n }\r\n\r\n .navbar-nav input {\r\n    display: block;\r\n    width: 100%;\r\n    height: 34px;\r\n    padding: 4px 8px;\r\n    font-size: 14px;\r\n    line-height: 1.42857143;\r\n    color: #555;\r\n    background: #eee;\r\n    border-color: #ddd;\r\n    background-image: none;\r\n    border: 1px solid #ccc;\r\n    border-radius: 4px;\r\n    box-shadow: inset 0 1px 1px rgba(0,0,0,.075);\r\n    -webkit-transition: border-color ease-in-out .15s,box-shadow ease-in-out .15s;\r\n    -ms-transition: border-color ease-in-out .15s,box-shadow ease-in-out .15s;\r\n    -moz-transition: border-color ease-in-out .15s,box-shadow ease-in-out .15s;\r\n    -o-transition: border-color ease-in-out .15s,box-shadow ease-in-out .15s;\r\n    transition: border-color ease-in-out .15s,box-shadow ease-in-out .15s;\r\n}\r\n\r\n .navbar-nav input:focus {\r\n\r\n    box-shadow: inset 0 1px 1px rgba(0,0,0,.5),0 0 11px rgba(0,0,0,.7);\r\n}\r\n\r\n .navbar-nav input.error {\r\n\r\n    background: #f97274;\r\n}\r\n\r\n@media (min-width: 768px) {\r\n\r\n    .top-banner .container {\r\n\r\n        width: 720px;\r\n    }\r\n\r\n     .menu-toggle {\r\n\r\n        display: none;\r\n    }\r\n\r\n     .nav-header {\r\n\r\n        float: left;\r\n    }\r\n\r\n     .navbar-collapse {\r\n\r\n        margin-right: 0;\r\n        margin-left: 0;\r\n        padding-left: 0;\r\n        padding-right: 0;\r\n        width: auto;\r\n        border-top: 0;\r\n        box-shadow: none;\r\n    }\r\n\r\n     .navbar-collapse.collapse {\r\n        display: block!important;\r\n        height: auto!important;\r\n        padding-bottom: 0;\r\n        overflow: visible!important;\r\n    }\r\n\r\n     .navbar-nav {\r\n\r\n        margin: 0;\r\n        float: right!important;\r\n    }\r\n\r\n     .navbar-nav>li {\r\n\r\n        float: left;\r\n    }\r\n\r\n     .navbar-nav>li>a {\r\n\r\n        padding-top: 15px;\r\n        padding-bottom: 15px;\r\n    }\r\n\r\n    .navbar-nav input {\r\n\r\n        padding-top: 2px;\r\n        padding-bottom: 2px;\r\n        width:310px;\r\n    }\r\n\r\n     .menu-toggle:hover {\r\n\r\n        background: #649def;\r\n    }\r\n}"; if (0) text = injector.translateUrls(text, require.toUrl("")); return text; });
-define('curl/plugin/css!theme/nav', ['curl/plugin/style!theme/nav'], function (sheet) { return sheet; });
 /*
  * Copyright 2012-2013 the original author or authors
  * @license MIT, see LICENSE.txt for details
@@ -12930,148 +13253,6 @@ define('curl/plugin/css!theme/nav', ['curl/plugin/style!theme/nav'], function (s
 	this.location
 	// Boilerplate for AMD and Node
 ));
-
-;define('app/partials/post', ['curl/plugin/text!app/tpls/post.html', 'theme/post', 'app/partials/mathjax', 'doT/doT', 'jquery/jquery'], function (
-	tplStr, dumbStyle, mathjax, doT, $
-) {
-'use strict';
-
-	var exports = {};
-	var $view;
-	var tpl = doT.template( tplStr );
-
-	var main = function() {
-
-		exports.init = init;
-		exports.render = render;
-	};
-
-	var init = function( view ) {
-
-		$view = $( view );
-	};
-
-	var render = function( data ) {
-
-		$view.html( tpl( data ) );
-
-		// MathJax
-		mathjax.queue( $( 'section.post' )[0] );
-	};
-
-	main();
-	return exports;
-});
-
-;define('app/partials/nav', ['curl/plugin/text!app/tpls/nav.html', 'app/utils/transition', 'theme/nav', 'jquery/jquery'], function (
-    tplStr, transition, dumbStyle, $
-) {
-'use strict';
-
-    var exports = {};
-    var aniBusy;
-    var inited;
-    var $view;
-    var $input;
-
-    var main = function() {
-
-        exports.isInited = function() {
-            return inited;
-        };
-        exports.init   = init;
-        exports.show   = _handlers.show;
-        exports.hide   = _handlers.hide;
-        exports.getDom = geDom;
-    };
-
-    var init = function( container ) {
-
-        $view = $( tplStr )
-        $view.prependTo( container );
-        $input = $( '[name=q]', $view );
-
-        _listen();
-
-        inited = true;
-    };
-
-    var geDom = function() {
-
-        return $view;
-    };
-
-    var _handlers = {
-
-        show: function( cb, notani ) {
-
-            if( $view.data( 'folded' ) ) return;
-            _listeners.toggle( null, cb, notani );
-        },
-
-        hide: function( cb, notani ) {
-
-            if( !$view.data( 'folded' ) ) return;
-            _listeners.toggle( null, cb, notani );
-        }
-    };
-
-    var _listen = function() {
-
-        $( 'button', $view ).click( _listeners.toggle );
-        $( 'form', $view ).submit( _listeners.search );
-    };
-
-    var _listeners = {
-
-        toggle: function( e, cb, notani ) {
-
-            var isFold     = $view.data( 'folded' );
-            var $menu      = $( '.navbar-collapse', $view );
-
-            if ( notani ) {
-
-                $view.data( 'folded', !isFold );
-                $menu.height( !isFold ? $menu[0].scrollHeight : 0  );
-                return;
-            }
-
-            if ( aniBusy ) return;
-
-            aniBusy = true;
-
-            $menu.animate(
-                { height: !isFold ? $menu[0].scrollHeight : 0 },
-                350,
-                'swing',
-                function() {
-                    aniBusy = false;
-                    $view.data( 'folded', !isFold );
-                    typeof cb == 'function' && cb.call( $view );
-                }
-            );
-        },
-
-        search: function( e ) {
-
-            var q = $input.val().trim();
-
-            if ( !q ) {
-
-                $input.addClass( 'error' );
-                return false;
-            }
-
-            $input.removeClass( 'error' );
-            location.hash = '#/search/' + encodeURIComponent( q );
-            return false;
-        }
-    };
-
-    main();
-
-    return exports;
-});
 /*
  * Copyright 2012-2013 the original author or authors
  * @license MIT, see LICENSE.txt for details
@@ -13224,9 +13405,6 @@ define('curl/plugin/css!theme/nav', ['curl/plugin/style!theme/nav'], function (s
 	this
 	// Boilerplate for AMD and Node
 ));
-
-;define('theme/gotop', ['curl/plugin/style', 'require'], function (injector, require) { var text = ".go-top .icon:before {\r\n\tcontent:'\\e612';\r\n}\r\n\r\n.go-top {\r\n\tdisplay: none;\r\n\tposition: fixed;\r\n\tz-index: 9999;\r\n\ttop: 8px;\r\n\tright: 8px;\r\n\tcolor:#333;\r\n\tfont-size: 20px;\r\n\topacity: 0;\r\n\theight: 0;\r\n\ttext-shadow: 0 40px 16px rgba(0,0,0,0.4);\r\n\tcursor: pointer;\r\n}\r\n\r\n@media (min-width: 768px) {\r\n\r\n\t.go-top:hover {\r\n\t\tcolor: #8cf2e3;\r\n\t}\r\n}"; if (0) text = injector.translateUrls(text, require.toUrl("")); return text; });
-define('curl/plugin/css!theme/gotop', ['curl/plugin/style!theme/gotop'], function (sheet) { return sheet; });
 /*
  * Copyright 2012-2014 the original author or authors
  * @license MIT, see LICENSE.txt for details
@@ -13350,124 +13528,6 @@ define('curl/plugin/css!theme/gotop', ['curl/plugin/style!theme/gotop'], functio
 	typeof process === 'undefined' ? undefined : process
 	// Boilerplate for AMD and Node
 ));
-
-;define('theme/about', ['curl/plugin/style', 'require'], function (injector, require) { var text = "section.about {\r\n\twidth: 100%;\r\n\tmin-height: 600px;\r\n\ttext-align: center;\r\n\tpadding-left: 0;\r\n\tpadding-right: 0;\r\n\tcolor:#999;\r\n\tfont-size: 12px;\r\n}\r\n\r\nsection.about .content {\r\n\r\n\tmax-width: 620px;\r\n\tmargin:0 auto;\r\n\tpadding: 0 20px;\r\n}\r\n\r\nsection.about h1 {\r\n\tcolor:#333;\r\n\tfont-size: 200%;\r\n}\r\n\r\nsection.about h2 {\r\n\r\n\tfont-size: 120%;\r\n}\r\n\r\nsection.about ul {\r\n\r\n\tpadding-left: 0;\r\n}\r\n\r\nsection.about li {\r\n\r\n\tlist-style: none;\r\n\tdisplay: inline-block;\r\n\tfont-size: 140%;\r\n\tmargin-right: .5em;\r\n}\r\n\r\nsection.about img {\r\n\r\n\tmax-width: 50%;\r\n}\r\n\r\n.icon.beer:before {\r\n\r\n\tcontent: '\\e617';\r\n}\r\n\r\n.icon.git:before {\r\n\tcontent: '\\e601';\r\n}\r\n\r\n.icon.weibo:before {\r\n\r\n\tcontent: '\\e600';\r\n}\r\n\r\n.icon.fb:before {\r\n\r\n\tcontent: '\\e60d';\r\n}\r\n\r\n.icon.linkedin:before {\r\n\r\n\tcontent: '\\e613';\r\n}\r\n\r\n.icon.mail:before {\r\n\r\n\tcontent: '\\e614';\r\n}"; if (0) text = injector.translateUrls(text, require.toUrl("")); return text; });
-define('curl/plugin/css!theme/about', ['curl/plugin/style!theme/about'], function (sheet) { return sheet; });
-
-;define('app/partials/gotop', ['theme/gotop', 'tween/Tween.js', 'app/utils/animationFrame', 'jquery/jquery'], function (
-	dumbStyle, TWEEN, animationFrame, $
-) {
-'use strict';
-
-	var $view;
-	var exports = {};
-	var _timer;
-	var _request = animationFrame.request;
-
-	var main = function() {
-
-		setTimeout( function() {
-
-			$view = $( '<div class="go-top"><span class="icon"></span></div>' ).appendTo( $( 'body') );
-
-			$view.click( function() {
-
-				scrollToTop();
-			});
-
-			window.onscroll = function( e ) {
-
-				if ( !$view.data( 'show' ) && window.scrollY > window.innerHeight ) {
-
-					$view.show().data( 'show', 1 );
-
-					if ( /Mobile/.test(navigator.userAgent) ) $view.css( 'opacity', 1 );
-					else {
-						_timer && clearTimeout( _timer );
-						_timer = setTimeout( function() {
-							$view.animate( { opacity: 1 }, 350 );
-						}, 200 );
-					}
-				}
-
-				if ( $view.data( 'show' ) && window.scrollY <= window.innerHeight ) {
-
-					$view.data( 'show', 0 );
-
-					if ( /Mobile/.test(navigator.userAgent) ) $view.hide();
-					else {
-						_timer && clearTimeout( _timer );
-						_timer = setTimeout( function() {
-							$view.animate( { opacity: 0}, 350, function() {
-								$view.hide();
-							});
-						}, 200 );
-					}
-				}
-			};
-
-			exports.scrollToTop = scrollToTop;
-		}, 0);
-	};
-
-	var scrollToTop = function() {
-
-		var position = { y: window.scrollY };
-		var update = function() {
-
-			window.scrollTo( 0, position.y );
-		};
-		var tween = new TWEEN.Tween( position )
-			.to( { y: 0 }, 600 )
-			.delay( 50 )
-			.easing( TWEEN.Easing.Cubic.InOut )
-			.onUpdate( update );
-
-		var animate = function() {
-
-			position.y > 0 && _request( animate );
-			TWEEN.update();
-		};
-
-		tween.start();
-		animate();
-	};
-
-	main();
-
-	return exports;
-});
-
-;define('app/partials/about', ['curl/plugin/text!app/tpls/about.html', 'theme/about', 'jquery/jquery'], function (
-	tplStr, dumbStyle, $
-) {
-'use strict';
-
-	var exports = {};
-	var $view;
-
-	var main = function() {
-
-		exports.init = init;
-		exports.render = render;
-	};
-
-	var init = function( view ) {
-
-		$view = $( view );
-	};
-
-	var render = function() {
-
-		$view.html( tplStr );
-	};
-
-	main();
-	return exports;
-});
-
-;define('theme/postList', ['curl/plugin/style', 'require'], function (injector, require) { var text = ".posts {\r\n\r\n    color: #666;\r\n}\r\n\r\n.posts .tag-top {\r\n\r\n    font-size: 1em;\r\n    margin-bottom: 72px;\r\n}\r\n\r\n.posts .tag-top>span {\r\n\r\n    padding: .5em;\r\n    border-radius: .5em;\r\n    background: #666;\r\n    color: #fff;\r\n    box-shadow: 0 60px 20px rgba(0,0,0,0.1);\r\n}\r\n\r\n.posts .title h1 {\r\n\r\n    color: #333;\r\n}\r\n\r\n.posts .title p {\r\n\r\n    color: #aaa;\r\n    font-size: 12px;\r\n    margin: 5px 0 3px 3px;\r\n}\r\n\r\n.posts .preview {\r\n\r\n    padding: 6px 18px;\r\n}\r\n\r\n.posts .more {\r\n\r\n    color: #fff;\r\n    background-color: #333;\r\n    position: relative;\r\n    display: block;\r\n    padding: 10px 15px;\r\n    border-radius: 4px;\r\n    text-align: center;\r\n}\r\n\r\n.posts .more:hover {\r\n\r\n    background-color: #8cf2e3;\r\n}\r\n\r\n.posts .pagers {\r\n\r\n    text-align: center;\r\n    border-top: 1px solid #333;\r\n    margin-top: 40px;\r\n    padding-top: 40px;\r\n}\r\n\r\n.posts .pagers a {\r\n\r\n    display: inline-block;\r\n    width: 40px;\r\n    height: 40px;\r\n    border-radius: 40px;\r\n    background: #333;\r\n    color: #fff;\r\n    line-height: 40px;\r\n}\r\n\r\n.posts .pagers a:hover {\r\n\r\n    background: #84fbca;\r\n}\r\n\r\n.icon.new, .icon.old {\r\n    margin:0;\r\n}\r\n\r\n.icon.new:before {\r\n    content:'\\e60b';\r\n}\r\n\r\n.icon.old:before {\r\n    content:'\\e60c';\r\n}\r\n\r\n.posts .icon.tag:before {\r\n    content: '\\e603';\r\n}\r\n\r\n.posts .icon.query:before {\r\n    content: '\\e60f';\r\n}"; if (0) text = injector.translateUrls(text, require.toUrl("")); return text; });
-define('curl/plugin/css!theme/postList', ['curl/plugin/style!theme/postList'], function (sheet) { return sheet; });
 /*
  * Copyright 2012-2013 the original author or authors
  * @license MIT, see LICENSE.txt for details
@@ -13648,35 +13708,6 @@ define('curl/plugin/css!theme/postList', ['curl/plugin/style!theme/postList'], f
 	typeof define === 'function' && define.amd ? define : function (factory) { module.exports = factory(require); }
 	// Boilerplate for AMD and Node
 ));
-
-;define('app/partials/page', ['curl/plugin/text!app/tpls/postList.html', 'theme/postList', 'doT/doT', 'jquery/jquery'], function (
-    tplStr, dumbStyle, doT, $
-) {
-'use strict';
-
-    var exports = {};
-    var $view;
-    var tpl = doT.template( tplStr );
-
-    var main = function() {
-
-        exports.init   = init;
-        exports.render = render;
-    };
-
-    var init = function( view ) {
-
-        $view = $( view );
-    };
-
-    var render = function( data ) {
-
-        $view.html( tpl( data ) );
-    };
-
-    main();
-    return exports;
-});
 /*
  * Copyright 2012-2013 the original author or authors
  * @license MIT, see LICENSE.txt for details
@@ -13788,44 +13819,6 @@ define('curl/plugin/css!theme/postList', ['curl/plugin/style!theme/postList'], f
 	typeof define === 'function' && define.amd ? define : function (factory) { module.exports = factory(require); }
 	// Boilerplate for AMD and Node
 ));
-
-;define('theme/foot', ['curl/plugin/style', 'require'], function (injector, require) { var text = "footer {\r\n    padding-top: 40px;\r\n    padding-bottom: 40px;\r\n    text-align: center;\r\n    background: url( 'http://renchi.qiniudn.com/birds.svg');\r\n    background-size:cover;\r\n    background-position: 50% 0%;\r\n    background-repeat: no-repeat;\r\n    background-color: #fff;\r\n    color: #000;\r\n    font-family: third-font, sans-serif;\r\n}\r\n\r\nfooter img {\r\n\r\n    width: 80px;\r\n    height: 80px;\r\n    border-radius: 80px;\r\n}\r\n\r\nfooter h1, footer h2, footer p {\r\n\r\n    margin:0;\r\n}\r\n\r\nfooter h1 {\r\n\r\n    font-size: 40px;\r\n}\r\n\r\nfooter p {\r\n\r\n    font-size: 20px;\r\n}"; if (0) text = injector.translateUrls(text, require.toUrl("")); return text; });
-define('curl/plugin/css!theme/foot', ['curl/plugin/style!theme/foot'], function (sheet) { return sheet; });
-
-;define('app/partials/foot', ['curl/plugin/text!app/tpls/foot.html', 'theme/foot', 'jquery/jquery'], function (
-    footTplStr, dumbStyle, $
-) {
-'use strict';
-
-    /**
-     * title
-     * @created date
-     * @author chillicomputer@gmail.com
-     */
-
-    var exports = {};
-    var $foot;
-
-    var main = function() {
-
-        exports.init   = init;
-        exports.getDom = getDom;
-    };
-
-    var init = function( container ) {
-
-        $foot = $( footTplStr ).appendTo( container );
-    };
-
-    var getDom = function() {
-
-        return $foot;
-    };
-
-    main();
-
-    return exports;
-});
 
 ;define('app/model', ['rest/rest', 'rest/interceptor/mime', 'jquery/jquery'], function (
     rest, mime, $

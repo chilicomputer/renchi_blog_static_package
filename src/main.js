@@ -45,10 +45,7 @@
 			{
 				name: 'jquery',
 				location: 'bower_components/jquery/dist',
-				main: 'jquery',
-				config: {
-					moduleLoader: 'curl/loader/cjsm11'
-				}
+				main: 'jquery'
 			},
 
 			{
