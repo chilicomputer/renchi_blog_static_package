@@ -3,7 +3,6 @@ define([
     'app/partials/page',
     'app/partials/nav',
     'app/partials/foot',
-    'app/partials/loader',
     'app/partials/error',
     'app/partials/tags',
     'app/partials/post',
@@ -20,7 +19,6 @@ define([
     page,
     nav,
     foot,
-    loader,
     error,
     tags,
     post,
@@ -66,25 +64,25 @@ define([
     /**
      * helpers
      */
-    var _showLoading = function() {
+    // var _showLoading = function() {
 
-        _loading = true;
-        _firstScreenReady && viewRootDom.addClass( 'fog' );
-        _firstScreenReady && loader.show( document.body );
-    };
+    //     _loading = true;
+    //     _firstScreenReady && viewRootDom.addClass( 'fog' );
+    //     _firstScreenReady && loader.show( document.body );
+    // };
 
-    var _hideLoading = function( cb ) {
+    // var _hideLoading = function( cb ) {
 
-        _timer && clearTimeout( _timer );
+    //     _timer && clearTimeout( _timer );
 
-        _timer = setTimeout( function() {
-            _loading = false;
-            viewRootDom.removeClass( 'fog' );
-            loader.hide();
+    //     _timer = setTimeout( function() {
+    //         _loading = false;
+    //         viewRootDom.removeClass( 'fog' );
+    //         loader.hide();
 
-            setTimeout( cb, 200 );
-        }, 200 );
-    };
+    //         setTimeout( cb, 200 );
+    //     }, 200 );
+    // };
     /**
      * view function's decorators
      */
@@ -130,11 +128,6 @@ define([
 
         nav.isInited() && nav.hide( null, true );
         viewFunc.apply();
-
-        !_loading && mathjax.digest();
-        _loading && _hideLoading( function() {
-            mathjax.digest();
-        });
     };
 
     var _flushViews = function( dataOrPromise, viewFunc ) {
@@ -170,7 +163,6 @@ define([
             // dataOrPromise._request.canceled = true;
             // queue the promise
             dataOrPromise._qid = uid();
-            _showLoading();
             _viewQueues[ dataOrPromise._qid ] = dataOrPromise;
         }
 

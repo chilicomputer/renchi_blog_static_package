@@ -1,6 +1,7 @@
 .top-banner {
     margin-bottom: 0;
-    background-color: #333;
+    background-color: #fff;
+    color: #333;
     border-bottom: 0;
     position: relative;
     min-height: 50px;
@@ -10,7 +11,7 @@
 
 .top-banner a {
 
-    color: #fff;
+    color: #333;
 }
 
 .top-banner .container {
@@ -136,7 +137,7 @@
 
  .navbar-nav input:focus {
 
-    box-shadow: inset 0 1px 1px rgba(0,0,0,.075),0 0 11px rgba(255,255,255,.7);
+    box-shadow: inset 0 1px 1px rgba(0,0,0,.075),0 0 11px rgba(0,0,0,.7);
 }
 
  .navbar-nav input.error {
