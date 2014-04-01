@@ -8,13 +8,12 @@
 		"when"       : "~2",
 		"meld"       : "~1",
 		"poly"       : "~0.5",
-		"rest"       : "~1",
+		"rest"       : "git://github.com/chilicomputer/rest.git#master",
 		"msgs"       : "~0.3",
 		"bootstrap"  : "~3.1",
-		"jquery"     : "~1.0",
-		"director"   : "~1.2",
-		"tweenjs"    : "",
-		"MathJax"    : ""
+		"jquery"     : "git://github.com/chilicomputer/jquery.git#master",
+		"director"   : "git://github.com/chilicomputer/director.git#master",
+		"tweenjs"    : "git://github.com/chilicomputer/tween.js.git#master"
 	},
 	"ignore": [
 	]
