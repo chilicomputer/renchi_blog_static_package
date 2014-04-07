@@ -49,18 +49,23 @@ pre code {
 
 .post p, .post li {
 
-  font-size: 15px;
+  font-size: 25px;
+}
+
+.post h3 {
+
+  font-size: 40px;
 }
 
 .post .title h1 {
-  font-size: 33px;
+  font-size: 50px;
   color: #333;
 }
 
 .post .title p {
 
   color: #aaa;
-  font-size: 12px;
+  font-size: 20px;
   margin: 5px 0 3px 3px;
 }
 
@@ -78,7 +83,7 @@ pre code {
 
 .post .foot p {
 
-  font-size: 15px;
+  font-size: 18px;
   font-weight: bold;
   color: #333;
   margin: 5px auto;
@@ -93,7 +98,7 @@ pre code {
 
   list-style: none;
   display: inline-block;
-  font-size: 11px;
+  font-size: 12px;
   margin:0 3px;
 }
 
@@ -129,4 +134,27 @@ pre code {
 .post a {
 
   color: #4671e3;
+}
+
+@media ( max-width: 640px ) {
+
+
+  .post p, .post li {
+
+    font-size: 15px;
+  }
+
+  .post h3 {
+
+    font-size: 20px;
+  }
+
+  .post .title h1 {
+    font-size: 30px;
+  }
+
+  .post .title p {
+
+    font-size: 12px;
+  }
 }

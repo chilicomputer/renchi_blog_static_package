@@ -68,11 +68,8 @@ define([
      */
     var _showLoading = function() {
 
-        if ( _firstScreenReady ) {
-
-            _loading = true;
-            _firstScreenReady && loader.show( viewDom );
-        }
+        _loading = true;
+        loader.show( viewDom );
     };
 
     var _hideLoading = function( cb ) {
@@ -103,19 +100,7 @@ define([
             post.init( viewDom );
             about.init( viewDom );
 
-            $( '#spinner' ).removeClass( 'ani' );
-
             _listeners.setViewportSize();
-
-            $( '.pic' ).one( $.support.transition, function () {
-                $( '.pic' ).hide();
-            });
-            setTimeout( function() {
-                $( '.views' ).addClass( 'rise' );
-            }, 600 );
-            setTimeout( function() {
-                $( '.pic' ).addClass( 'fall' );
-            }, 800 );
         }
 
         viewFunc.apply( null );
@@ -125,19 +110,8 @@ define([
 
         _hideLoading( function() {
 
-            if ( !_firstScreenReady ) {
-
-                viewFunc.apply();
-                $( '.views' ).one( $.support.transition, function () {
-                    mathjax.digest();
-                });
-            }
-
-            else {
-
-                viewFunc.apply();
-                mathjax.digest();
-            }
+            viewFunc.apply();
+            mathjax.digest();
         });
     };
 

@@ -11,11 +11,11 @@
 
 body {
   margin:0;
-  font-family: "Microsoft Yahei","Hiragino Sans GB","WenQuanYi Micro Hei","third-font",Helvetica,Arial,sans-serif;
+  font-family: "Microsoft Yahei","Hiragino Sans GB","WenQuanYi Micro Hei", Helvetica,Arial,sans-serif;
   font-size: 14px;
   line-height: 1.42857143;
   color: #333;
-  background: #000;
+  background: #fff;
 }
 
 hr {
@@ -86,242 +86,14 @@ span.icon {
   -moz-osx-font-smoothing: grayscale;
 }
 
-.pic, .views {
-
-  -webkit-backface-visibility: hidden;
-  -moz-backface-visibility: hidden;
-  backface-visibility: hidden;
-}
-
-.pic {
-  background-color: peru;
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-
-  -webkit-transition: -webkit-transform .6s linear;
-  -ms-transition: -ms-transform .6s linear;
-  -o-transition: -o-transform .6s linear;
-  -moz-transition: -moz-transform .6s linear;
-  transition: transform .6s linear;
-  -webkit-transform-style: preserve-3d;
-  -ms-transform-style: preserve-3d;
-  -o-transform-style: preserve-3d;
-  -moz-transform-style: preserve-3d;
-  transform-style: preserve-3d;
-  -webkit-transform-origin: 0% 100%;
-  -ms-transform-origin: 0% 100%;
-  -o-transform-origin: 0% 100%;
-  -moz-transform-origin: 0% 100%;
-  transform-origin: 0% 100%;
-}
-
-.pic .mask {
-
-  width: 100%;
-  height:100%;
-  position: absolute;
-  z-index: 100;
-  background: #000;
-  opacity: 0;
-  -webkit-transition: opacity .5s linear;
-  -ms-transition: opacity .5s linear;
-  -o-transition: opacity .5s linear;
-  -moz-transition: opacity .5s linear;
-  transition: opacity .5s linear;
-}
-
-#spinner {
-  height: 80px;
-  width: 80px;
-  position: absolute;
-  z-index: 1;
-  top: 150px;
-  left: 50%;
-  margin-left:-40px;
-  margin-top:-40px;
-  transform: rotate(45deg);
-  -webkit-transform: rotate(45deg);
-  -moz-transform: rotate(45deg);
-  -ms-transform: rotate(45deg);
-  -o-transform: rotate(45deg);
-  transition: opacity .5s linear;
-  -webkit-transition: opacity .5s linear;
-  -moz-transition: opacity .5s linear;
-  -ms-transition: opacity .5s linear;
-  -o-transition: opacity .5s linear;
-}
-
-#spinner:before, #spinner:after{
-  content: '';
-  display: block;
-  position: absolute;
-  height: 100%;
-  width: 100%;
-  border-radius: 50%;
-  background: palegoldenrod;
-  box-shadow: 0px 2px 3px 3px palegoldenrod;
-}
-#spinner.ani:before {
-  margin-top: -8%;
-  margin-left: -10%;
-  -webkit-animation: foo .5s linear infinite;
-  -moz-animation: foo .5s linear infinite;
-  -ms-animation: foo .5s linear infinite;
-  -o-animation: foo .5s linear infinite;
-  animation: foo .5s linear infinite;
-}
-#spinner.ani:after {
-  -webkit-animation: foo .5s .25s linear infinite;
-  -moz-animation: foo .5s .25s linear infinite;
-  -ms-animation: foo .5s .25s linear infinite;
-  -o-animation: foo .5s .25s linear infinite;
-  animation: foo .5s .25s linear infinite;
-}
-@keyframes foo{
-  50%{
-    transform: rotateX(30deg) rotateY(30deg);
-  }
-}
-@-webkit-keyframes foo{
-  50%{
-    -webkit-transform: rotateX(30deg) rotateY(30deg);
-  }
-}
-@-moz-keyframes foo{
-  50%{
-    -moz-transform: rotateX(30deg) rotateY(30deg);
-  }
-}
-@-ms-keyframes foo{
-  50%{
-    -ms-transform: rotateX(30deg) rotateY(30deg);
-  }
-}
-@-o-keyframes foo{
-  50%{
-    -o-transform: rotateX(30deg) rotateY(30deg);
-  }
-}
-
-.pic .svg-wrap {
-  position:absolute;
-  top:0;
-  width:100%;
-  height: 100%;
-  background: url('./res/bird_l.png');
-  background-size:contain;
-  background-position: 100% 0px;
-  background-repeat: no-repeat;
-  z-index: 10;
-}
-
-.pic .title {
-
-  position: absolute;
-  top:0;
-  z-index: 100;
-  margin: 20px;
-  font-family: third-font;
-}
-
-.pic .title .name {
-
-  padding:  0 5px;
-}
-
-.pic .title .name span {
-
-  background: black;
-  color: white;
-  font-size: 20px;
-}
-
-.pic .title .desc {
-
-  font-size: 15px;
-  font-weight: bold;
-  color: white;
-}
-
-.pic.fall .mask {
-
-  opacity: .8;
-}
-
-.pic.fall {
-
-  -webkit-transform: perspective(400px) rotate3d(1,0,0,15deg) translate3d( 0, -200px, 0 );
-  -ms-transform: perspective(400px) rotate3d(1,0,0,15deg) translate3d( 0, -200px, 0 );
-  -o-transform: perspective(400px) rotate3d(1,0,0,15deg) translate3d( 0, -200px, 0 );
-  -moz-transform: perspective(400px) rotate3d(1,0,0,15deg) translate3d( 0, -200px, 0 );
-  transform: perspective(400px) rotate3d(1,0,0,15deg) translate3d( 0, -200px, 0 );
-
-}
-
 .views {
-
-  position: absolute;
-  z-index: 1000;
-  top:100%;
-  background-color: black;
-  margin-top: -60px;
-  width:100%;
-  padding-top: 60px;
-  min-height: 61px;
-  transition: top .5s linear;
-  -webkit-transition: top .6s linear;
-  -moz-transition: top .6s linear;
-  -ms-transition: top .6s linear;
-  -o-transition: top .6s linear;
 }
 
-.views.rise {
-
-  top:0%;
-}
-
-.views.fog {
-
-  -webkit-filter: blur(2px);
-  -ms-filter: blur(2px);
-  -moz-filter: blur(2px);
-  -o-filter: blur(2px);
-  filter: blur(2px);
-}
-
-@media (orientation: landscape) {
-
-  #spinner {
-
-    top: 50%;
-  }
-}
-
-@media (min-width: 768px) {
+@media (min-width: 940px) {
 
   section {
-    width: 695px;
+    width: 900px;
     margin: 0 auto;
-  }
-}
-
-@media only screen and (min-width : 1224px) {
-  .pic .svg-wrap {
-    background: url('./res/bird.svg');
-    background-size:contain;
-    background-position: 100% 0px;
-    background-repeat: no-repeat;
-  }
-}
-
-@media only screen and (min-device-width : 320px) and (max-device-width : 640px) {
-  .pic .svg-wrap {
-    background: url('./res/bird_s.png');
-    background-size:contain;
-    background-position: 100% 0px;
-    background-repeat: no-repeat;
   }
 }
 
