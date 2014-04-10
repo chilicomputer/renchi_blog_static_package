@@ -34,9 +34,10 @@ hr {
   box-sizing: border-box;
 }
 
-a, a:link, a:active {
+a, a:link, a:active, a:focus {
   color: #333;
   text-decoration: none;
+  outline: none;
 }
 
 button:active, button:focus, input:focus {

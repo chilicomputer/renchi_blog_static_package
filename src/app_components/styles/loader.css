@@ -10,7 +10,7 @@
   	padding: 0;
 }
 
-@-webkit-keyframes 'loadbars' {
+@-webkit-keyframes loadbars {
 	0%{
 		height: 5px;
 		margin-top: 10px;
@@ -25,7 +25,7 @@
 	}
 }
 
-@-ms-keyframes 'loadbars' {
+@-ms-keyframes loadbars {
 	0%{
 		height: 5px;
 		margin-top: 10px;
@@ -40,7 +40,7 @@
 	}
 }
 
-@-o-keyframes 'loadbars' {
+@-o-keyframes loadbars {
 	0%{
 		height: 5px;
 		margin-top: 10px;
@@ -55,7 +55,7 @@
 	}
 }
 
-@-moz-keyframes 'loadbars' {
+@-moz-keyframes loadbars {
 	0%{
 		height: 5px;
 		margin-top: 10px;
@@ -70,7 +70,7 @@
 	}
 }
 
-@keyframes 'loadbars' {
+@keyframes loadbars {
 	0%{
 		height: 5px;
 		margin-top: 10px;
@@ -95,19 +95,43 @@
 }
 .loader li:first-child{
 	-webkit-animation: loadbars .6s ease-in-out infinite 0s;
+	-moz-animation: loadbars .6s ease-in-out infinite 0s;
+	-ms-animation: loadbars .6s ease-in-out infinite 0s;
+	-o-animation: loadbars .6s ease-in-out infinite 0s;
+	animation: loadbars .6s ease-in-out infinite 0s;
 }
 .loader li:nth-child(2){
 	-webkit-animation: loadbars .6s ease-in-out infinite -0.1s;
+	-moz-animation: loadbars .6s ease-in-out infinite -0.1s;
+	-ms-animation: loadbars .6s ease-in-out infinite -0.1s;
+	-o-animation: loadbars .6s ease-in-out infinite -0.1s;
+	animation: loadbars .6s ease-in-out infinite -0.1s;
 }
 .loader li:nth-child(3){
 	-webkit-animation: loadbars .6s ease-in-out infinite -0.2s;
+	-moz-animation: loadbars .6s ease-in-out infinite -0.2s;
+	-ms-animation: loadbars .6s ease-in-out infinite -0.2s;
+	-o-animation: loadbars .6s ease-in-out infinite -0.2s;
+	animation: loadbars .6s ease-in-out infinite -0.2s;
 }
 .loader li:nth-child(4){
 	-webkit-animation: loadbars .6s ease-in-out infinite -0.3s;
+	-moz-animation: loadbars .6s ease-in-out infinite -0.3s;
+	-ms-animation: loadbars .6s ease-in-out infinite -0.3s;
+	-o-animation: loadbars .6s ease-in-out infinite -0.3s;
+	animation: loadbars .6s ease-in-out infinite -0.3s;
 }
 .loader li:nth-child(5){
 	-webkit-animation: loadbars .6s ease-in-out infinite -0.4s;
+	-moz-animation: loadbars .6s ease-in-out infinite -0.4s;
+	-ms-animation: loadbars .6s ease-in-out infinite -0.4s;
+	-o-animation: loadbars .6s ease-in-out infinite -0.4s;
+	animation: loadbars .6s ease-in-out infinite -0.4s;
 }
 .loader li:nth-child(6){
 	-webkit-animation: loadbars .6s ease-in-out infinite -0.5s;
+	-moz-animation: loadbars .6s ease-in-out infinite -0.5s;
+	-ms-animation: loadbars .6s ease-in-out infinite -0.5s;
+	-o-animation: loadbars .6s ease-in-out infinite -0.5s;
+	animation: loadbars .6s ease-in-out infinite -0.5s;
 }
