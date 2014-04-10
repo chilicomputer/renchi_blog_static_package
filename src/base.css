@@ -9,10 +9,15 @@
   src: url('./res/icomoon.eot?#iefix') format('embedded-opentype'), url('./res/icomoon.woff') format('woff'), url('./res/icomoon.ttf') format('truetype'), url('./res/icomoon.svg#icomoon') format('svg');
 }
 
+html {
+
+  font-size: 62.5%;
+}
+
 body {
   margin:0;
   font-family: "Microsoft Yahei","Hiragino Sans GB","WenQuanYi Micro Hei", Helvetica,Arial,sans-serif;
-  font-size: 14px;
+  font-size: 1rem;
   line-height: 1.42857143;
   color: #333;
   background: #fff;

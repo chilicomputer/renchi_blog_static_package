@@ -1,5 +1,5 @@
 .posts {
-
+    font-size: 1.3rem;
     color: #666;
 }
 
@@ -24,14 +24,14 @@
 }
 
 .posts .title h1 {
-
+    font-size: 1.6rem;
     color: #333;
 }
 
 .posts .title p {
 
     color: #aaa;
-    font-size: 12px;
+    font-size: 1.4rem;
     margin: 5px 0 3px 3px;
 }
 

@@ -3,6 +3,7 @@ define(function(){
 
 	var exports = {};
 	var _queueDoms = [];
+	var _configured;
 
 	var main = function() {
 
@@ -22,6 +23,18 @@ define(function(){
 		curl( ['js!mathjax'] ).then( function() {
 
 			var dom;
+
+			if ( !_configured ) {
+
+				window.MathJax.Hub.Config({
+
+					'HTML-CSS': {
+					    linebreaks: { automatic: true, width: 'container' }
+					}
+				});
+
+				_configured = true;
+			}
 
 			while( _queueDoms.length ) {
 

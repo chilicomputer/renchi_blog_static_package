@@ -10,7 +10,7 @@ section.tag-list div {
 
 section.tag-list li {
 
-	font-size: 18px;
+	font-size: 1.8rem;
 	font-weight: bold;
 	margin:8px;
 	list-style: none;
@@ -36,7 +36,7 @@ section.tag-list .count {
 	visibility: visible;
 	min-width: 10px;
 	padding: 3px 7px;
-	font-size: 12px;
+	font-size: 1.2rem;
 	font-weight: 700;
 	color: #fff;
 	line-height: 1;
