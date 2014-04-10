@@ -81,7 +81,10 @@
 }
 
 .icon.new, .icon.old {
-    margin:0;
+    margin: 0;
+    font-size: 18px;
+    line-height: 40px;
+    top: 0;
 }
 
 .icon.new:before {
