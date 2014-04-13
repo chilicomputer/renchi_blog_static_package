@@ -32,7 +32,10 @@ define([
 	var show = function() {
 
 		$mask.appendTo( $( 'body' ) );
-		$( 'body' ).css( 'overflow', 'hidden' );
+		$( 'html,body' ).css({
+			'overflow': 'hidden',
+			'height': '100%'
+		});
 		$root.css( transition.vendor + 'TransformOrigin', '50% 0%' );
 		$root.css( transition.vendor + 'Transform', 'scale(1.3)' );
 		$root.css( transition.vendor + 'Filter', 'blur(4px)' );
@@ -41,7 +44,10 @@ define([
 	var hide = function() {
 
 		$mask.remove();
-		$( 'body' ).css( 'overflow', '' );
+		$( 'html,body' ).css({
+			'overflow': '',
+			'height': ''
+		});
 		$root.css( transition.vendor + 'TransformOrigin', '' );
 		$root.css( transition.vendor + 'Transform', '' );
 		$root.css( transition.vendor + 'Filter', '' );

@@ -22,7 +22,8 @@ define([
 		searchDialog = dialog({
 
 			content: $view,
-			yes: _watchers.search
+			yes: _watchers.search,
+			no:  _watchers.reset
 		});
 
 		exports.show = show;
@@ -41,9 +42,14 @@ define([
 			    return true;
 			}
 
-			$input.removeClass( 'error' );
+
 			location.hash = '#/search/' + encodeURIComponent( q );
-			return false;
+			_watchers.reset();
+		},
+
+		reset: function() {
+
+			$input.val( '' ).removeClass( 'error' );
 		}
 	};
 
