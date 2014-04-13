@@ -1,4 +1,3 @@
-
 define(function(){
 'use strict';
 
@@ -8,8 +7,5 @@ define(function(){
      * @author chillicomputer@gmail.com
      */
 
-    return function() {
-
-        return Math.random().toString( 18 ).substr( 2, 32 );
-    };
+    return function() {};
 });

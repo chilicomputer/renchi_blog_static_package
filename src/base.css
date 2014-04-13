@@ -31,6 +31,12 @@ hr {
   -webkit-box-sizing: border-box;
   -moz-box-sizing: border-box;
   box-sizing: border-box;
+
+  -webkit-backface-visibiligy: hidden;
+  -moz-backface-visibiligy: hidden;
+  -ms-backface-visibiligy: hidden;
+  -o-backface-visibiligy: hidden;
+  backface-visibiligy: hidden;
 }
 
 :before, :after {
@@ -90,6 +96,18 @@ span.icon {
 
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+input::-webkit-input-placeholder {
+  color: #666;
+}
+
+input::-moz-placeholder {
+  color: #666;
+}
+
+input:-ms-input-placeholder {
+  color: #666;
 }
 
 .views {

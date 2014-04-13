@@ -10,7 +10,7 @@ define([
 
     var transitionEnd = function () {
 
-        var el = document.createElement( 'bootstrap' );
+        var el = document.createElement( 'div' );
 
         var transEndEventNames = {
             'WebkitTransition': 'webkitTransitionEnd',
@@ -50,5 +50,5 @@ define([
     });
 
     // return a numb
-    return null;
+    return exports;
 });

@@ -1,12 +1,12 @@
 define([
     'text!app/tpls/nav.html',
-    'app/utils/transition',
     'theme/nav',
+    'app/partials/search',
     'jquery'
 ], function(
     tplStr,
-    transition,
     dumbStyle,
+    search,
     $
 ){
 'use strict';
@@ -62,7 +62,7 @@ define([
     var _listen = function() {
 
         $( 'button', $view ).click( _listeners.toggle );
-        $( 'form', $view ).submit( _listeners.search );
+        $( '#search', $view ).click( _listeners.search );
     };
 
     var _listeners = {
@@ -95,19 +95,9 @@ define([
             );
         },
 
-        search: function( e ) {
+        search: function() {
 
-            var q = $input.val().trim();
-
-            if ( !q ) {
-
-                $input.addClass( 'error' );
-                return false;
-            }
-
-            $input.removeClass( 'error' );
-            location.hash = '#/search/' + encodeURIComponent( q );
-            return false;
+            search.show();
         }
     };
 
