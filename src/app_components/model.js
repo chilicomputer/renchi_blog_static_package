@@ -45,7 +45,7 @@ define([
     var _fetchData = function( request ) {
 
         var asyncData = rest
-            .chain( mime )( request )
+            .chain( mime )( $.extend( request, { headers: { 'X-Requested-With': 'XMLHttpRequest' } } ) )
             .then( function( res ) {
 
                 $agent.trigger( 'whenrest' );
