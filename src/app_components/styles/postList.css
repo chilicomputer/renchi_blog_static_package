@@ -84,7 +84,7 @@
     margin: 0;
     font-size: 18px;
     line-height: 40px;
-    top: 0;
+    top: 1px;
 }
 
 .icon.new:before {

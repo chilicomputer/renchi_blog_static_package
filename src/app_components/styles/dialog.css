@@ -5,7 +5,7 @@
   top: 0;
   left:0;
   width: 100%;
-  color:#000;
+  color:#fff;
 
   -webkit-transition: -webkit-transform .4s ease-out, opacity .4s ease-out;
   -moz-transition: -moz-transform .4s ease-out, opacity .4s ease-out;
@@ -50,9 +50,9 @@
   display: inline-block;
   padding: 0 1.5rem;
   margin: 0 1.5rem;
-  color: #000;
+  color: #fff;
   border-radius: 1rem;
-  border: 1px solid #000;
+  border: 2px solid #fff;
   background: rgba(255,255,255,0.1);
 }
 

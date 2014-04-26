@@ -13,10 +13,10 @@ define([
         var el = document.createElement( 'div' );
 
         var transEndEventNames = {
+            'transition':       'transitionend',
             'WebkitTransition': 'webkitTransitionEnd',
             'MozTransition':    'transitionend',
-            'OTransition':      'oTransitionEnd otransitionend',
-            'transition':       'transitionend'
+            'OTransition':      'oTransitionEnd otransitionend'
         };
 
         for ( var name in transEndEventNames ) {
