@@ -22,6 +22,7 @@ app.use( function( req, res, next ) {
 
 				req.url = redirect;
 				next();
+				return;
 			}
 
 			else {
@@ -43,6 +44,7 @@ app.use( function( req, res, next ) {
 
 				req.url = redirect;
 				next();
+				return;
 			}
 		}
 		catch( e ) {
