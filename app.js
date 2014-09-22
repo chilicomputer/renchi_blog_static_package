@@ -50,6 +50,7 @@ app.use( function( req, res, next ) {
 			continue;
 		}
 	}
+	next();
 });
 
 if ( type == 'src' ) {
